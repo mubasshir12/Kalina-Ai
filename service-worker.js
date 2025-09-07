@@ -1,7 +1,9 @@
 const CACHE_NAME = 'kalina-ai-cache-v1';
 const ASSETS_TO_CACHE = [
     './',
-    './index.html'
+    './index.html',
+    './manifest.json',
+    './index.tsx'
 ];
 
 self.addEventListener('install', (event) => {
@@ -36,23 +38,17 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-    // Only handle navigation requests for the app shell
-    if (event.request.mode === 'navigate') {
-        event.respondWith(
-            caches.match(event.request)
-                .then((response) => {
-                    // Cache hit - return response
-                    if (response) {
-                        return response;
-                    }
-                    // Not in cache - fetch from network
-                    return fetch(event.request);
-                }).catch(() => {
-                    // If both fail, you can show a generic offline page,
-                    // but for this simple case, we'll just let the browser handle the error.
-                })
-        );
-    }
-    // For other requests (like API calls, scripts from CDN), just let them go to the network
-    return;
+    // For navigation and local assets, try cache first.
+    // This strategy is simple and effective for app shell caching.
+    event.respondWith(
+        caches.match(event.request)
+            .then((response) => {
+                // Cache hit - return response
+                if (response) {
+                    return response;
+                }
+                // Not in cache - fetch from network
+                return fetch(event.request);
+            })
+    );
 });
