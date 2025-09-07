@@ -208,9 +208,10 @@ export const useChatHandler = ({
             let personaContext: string | undefined = undefined;
             let capabilitiesContext: string | undefined = undefined;
 
+            personaContext = getPersonaContext();
+
             if (plan.isCreatorRequest) {
                 developerContext = `My developer is ${developerProfile.name}. He is a ${developerProfile.age}-year-old from ${developerProfile.location}, and ${developerProfile.role} of ${developerProfile.appName}.`;
-                personaContext = getPersonaContext();
             }
 
             if (plan.isCapabilitiesRequest) {
