@@ -5,7 +5,6 @@ import WelcomeScreen from './WelcomeScreen';
 import MemoryManagement from './MemoryManagement';
 import TranslatorView from './Translator';
 import UsageStatsView from './UsageStatsView';
-import ConversationNavigator from './ConversationNavigator';
 
 interface ViewRendererProps {
     currentView: View;
@@ -29,11 +28,6 @@ interface ViewRendererProps {
     onTranslationComplete: (tokens: { input: number; output: number }) => void;
     setModalImage: (url: string | null) => void;
     setCodeForPreview: (data: { code: string; language: string; } | null) => void;
-    messageIndices: number[];
-    activeMessageIndex: number | null;
-    onJumpToMessage: (index: number) => void;
-    thumbInfo: { top: number, height: number };
-    messagePositions: Map<number, number>;
 }
 
 const ViewRenderer: React.FC<ViewRendererProps> = ({
@@ -58,11 +52,6 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
     onTranslationComplete,
     setModalImage,
     setCodeForPreview,
-    messageIndices,
-    activeMessageIndex,
-    onJumpToMessage,
-    thumbInfo,
-    messagePositions,
 }) => {
 
     switch (currentView) {
@@ -111,16 +100,6 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
                                 </div>
                             )}
                         </div>
-                         {!showWelcomeScreen && activeConversation && messageIndices.length > 1 && (
-                            <ConversationNavigator
-                                messages={activeConversation.messages}
-                                messageIndices={messageIndices}
-                                activeMessageIndex={activeMessageIndex}
-                                onJumpToMessage={onJumpToMessage}
-                                thumbInfo={thumbInfo}
-                                messagePositions={messagePositions}
-                            />
-                        )}
                     </div>
                 </main>
             );

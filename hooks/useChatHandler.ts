@@ -1,8 +1,8 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Content, Part } from '@google/ai';
-import { ChatMessage as ChatMessageType, Suggestion, ChatModel, LTM, CodeSnippet, GroundingChunk, UserProfile, Tool } from '../types';
-import { initializeAiClient } from '../services/aiClient';
-import { startChatSession } from '../services/chatService';
+import { ChatMessage as ChatMessageType, Suggestion, ChatModel, LTM, CodeSnippet, GroundingChunk, UserProfile, Tool, Conversation } from '../types';
+import { getAiClient } from '../services/aiClient';
+import { startChatSession, buildSystemInstruction } from '../services/chatService';
 import { planResponse } from '../services/geminiService';
 import { updateMemory, summarizeConversation } from '../services/memoryService';
 import { processAndSaveCode, findRelevantCode } from '../services/codeService';
@@ -154,16 +154,25 @@ export const useChatHandler = ({
 
         let currentConversationId = activeConversationId;
         let isFirstTurnInConversation = false;
+        let conversationForThisTurn: Conversation;
 
         if (!currentConversationId) {
             const newId = crypto.randomUUID();
-            setConversations(prev => [{ id: newId, title: "New Chat", messages: [] }, ...prev]);
+            conversationForThisTurn = { id: newId, title: "New Chat", messages: [] };
+            setConversations(prev => [conversationForThisTurn, ...prev]);
             setActiveConversationId(newId);
             currentConversationId = newId;
             isFirstTurnInConversation = true;
         } else {
-            const currentConvo = conversations.find(c => c.id === currentConversationId);
-            isFirstTurnInConversation = currentConvo?.messages.length === 0;
+            const foundConvo = conversations.find(c => c.id === currentConversationId);
+            if (!foundConvo) {
+                logError(new Error(`useChatHandler: Could not find active conversation with ID ${currentConversationId}`));
+                setIsLoading(false);
+                stopResponseTimer();
+                return;
+            }
+            conversationForThisTurn = foundConvo;
+            isFirstTurnInConversation = conversationForThisTurn.messages.length === 0;
         }
 
         setError(null);
@@ -322,11 +331,9 @@ export const useChatHandler = ({
                 }
             }
 
-            const currentConversationState = conversations.find(c => c.id === currentConversationId);
-            const summary = currentConversationState?.summary;
-            // Refine STM to last 10 turns (20 messages)
-            const shortTermMemory = currentConversationState ? currentConversationState.messages.slice(-20) : [];
-            
+            const historyMessages = conversationForThisTurn.messages;
+            const summary = conversationForThisTurn.summary;
+
             let retrievedCodeSnippets: CodeSnippet[] = [];
             if (plan.needsCodeContext && codeMemory.length > 0) {
                 const codeDescriptions = codeMemory.map(({ id, description }) => ({ id, description }));
@@ -336,24 +343,37 @@ export const useChatHandler = ({
             }
 
             const modelName = models.find(m => m.id === modelToUse)?.name || 'Kalina AI';
-            const chat = startChatSession(modelToUse, isThinkingEnabled, isWebSearchEnabled, modelName, ltm, userProfile, isFirstTurnInConversation, transformMessagesToHistory(shortTermMemory), summary, retrievedCodeSnippets, developerContext, personaContext, capabilitiesContext);
+            let stream;
 
-            const parts: Part[] = [];
-            if (images) {
-                images.forEach(image => {
-                    parts.push({ inlineData: { data: image.base64, mimeType: image.mimeType } });
+            const userMessageParts: Part[] = [];
+            if (images) { images.forEach(image => userMessageParts.push({ inlineData: { data: image.base64, mimeType: image.mimeType } })); }
+            if (file) { userMessageParts.push({ inlineData: { data: file.base64, mimeType: file.mimeType } }); }
+            if (finalPromptForModel) { userMessageParts.push({ text: finalPromptForModel }); }
+            if (userMessageParts.length === 0) throw new Error("Cannot send an empty message.");
+
+            if (isWebSearchEnabled) {
+                const ai = getAiClient();
+                const systemInstruction = buildSystemInstruction(
+                    isFirstTurnInConversation, modelName, ltm, userProfile, summary, retrievedCodeSnippets, developerContext, personaContext, capabilitiesContext
+                );
+                const history = transformMessagesToHistory(historyMessages);
+                const contents = [...history, { role: 'user', parts: userMessageParts }];
+
+                stream = await ai.models.generateContentStream({
+                    model: modelToUse,
+                    contents: contents,
+                    config: {
+                        systemInstruction: systemInstruction,
+                        tools: [{ googleSearch: {} }],
+                    }
                 });
+            } else {
+                const chat = startChatSession(
+                    modelToUse, isThinkingEnabled, modelName, ltm, userProfile, isFirstTurnInConversation, 
+                    transformMessagesToHistory(historyMessages), summary, retrievedCodeSnippets, developerContext, personaContext, capabilitiesContext
+                );
+                stream = await chat.sendMessageStream({ message: userMessageParts });
             }
-            if (file) {
-                parts.push({ inlineData: { data: file.base64, mimeType: file.mimeType } });
-            }
-            if (finalPromptForModel) {
-                parts.push({ text: finalPromptForModel });
-            }
-
-            if (parts.length === 0) throw new Error("Cannot send an empty message.");
-            
-            const stream = await chat.sendMessageStream({ message: parts });
             
             // As soon as the stream starts, clear pre-computation states.
             if (longToolUseTimer) {

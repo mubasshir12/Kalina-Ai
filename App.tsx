@@ -21,7 +21,6 @@ import Globe from './components/Globe';
 import ImageModal from './components/ImageModal';
 import CodePreviewModal from './components/CodePreviewModal';
 import { useScrollSpy } from './hooks/useScrollSpy';
-import { useMessagePositions } from './hooks/useMessagePositions';
 
 const models: ModelInfo[] = [
     { id: 'gemini-2.5-flash', name: 'Kalina 2.5 Flash', description: 'Optimized for speed and efficiency.' },
@@ -60,7 +59,6 @@ const App: React.FC = () => {
     const [consoleMode, setConsoleMode] = useState<ConsoleMode>('auto');
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const [thumbInfo, setThumbInfo] = useState({ top: 0, height: 100 });
 
     const conversationManager = useConversations();
     const { ltm, setLtm, codeMemory, setCodeMemory, userProfile, setUserProfile } = useMemory();
@@ -95,7 +93,6 @@ const App: React.FC = () => {
     }, [activeConversation]);
 
     const activeMessageIndex = useScrollSpy(scrollContainerRef, messageIndices);
-    const messagePositions = useMessagePositions(scrollContainerRef, messageIndices);
     
     const [navigatorIndex, setNavigatorIndex] = useState<number | null>(null);
 
@@ -109,35 +106,6 @@ const App: React.FC = () => {
         }
     }, [activeMessageIndex, messageIndices]);
     
-    useEffect(() => {
-        const container = scrollContainerRef.current;
-        if (!container) return;
-
-        const updateThumb = () => {
-            const { scrollTop, scrollHeight, clientHeight } = container;
-            if (scrollHeight <= clientHeight) {
-                setThumbInfo({ top: 0, height: 100 });
-                return;
-            }
-            const thumbHeight = (clientHeight / scrollHeight) * 100;
-            const thumbTop = (scrollTop / scrollHeight) * 100;
-            setThumbInfo({ top: thumbTop, height: thumbHeight });
-        };
-
-        updateThumb(); // Initial calculation
-
-        container.addEventListener('scroll', updateThumb, { passive: true });
-        
-        // Update on resize and content changes
-        const resizeObserver = new ResizeObserver(updateThumb);
-        resizeObserver.observe(container);
-
-        return () => {
-            container.removeEventListener('scroll', updateThumb);
-            resizeObserver.disconnect();
-        };
-    }, [activeConversation]);
-
     const handleNavigate = (direction: 'up' | 'down') => {
         const scrollContainer = scrollContainerRef.current;
         if (!scrollContainer || navigatorIndex === null || messageIndices.length < 2) return;
@@ -160,17 +128,6 @@ const App: React.FC = () => {
         }
     };
     
-    const handleJumpToMessage = (messageIndex: number) => {
-        const scrollContainer = scrollContainerRef.current;
-        if (!scrollContainer) return;
-        
-        const element = document.getElementById(`message-${messageIndex}`);
-        if (element) {
-            scrollContainer.scrollTo({ top: element.offsetTop, behavior: 'smooth' });
-            setNavigatorIndex(messageIndex);
-        }
-    };
-
     const isAtStart = navigatorIndex !== null && navigatorIndex === 0;
     const isAtEnd = navigatorIndex !== null && messageIndices.length > 0 && navigatorIndex === messageIndices.length - 1;
     
@@ -403,11 +360,6 @@ const App: React.FC = () => {
                     onTranslationComplete={handleTranslationComplete}
                     setModalImage={setModalImage}
                     setCodeForPreview={setCodeForPreview}
-                    messageIndices={messageIndices}
-                    activeMessageIndex={activeMessageIndex}
-                    onJumpToMessage={handleJumpToMessage}
-                    thumbInfo={thumbInfo}
-                    messagePositions={messagePositions}
                 />
 
                 {currentView === 'chat' && (
