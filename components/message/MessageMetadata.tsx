@@ -10,7 +10,9 @@ const MessageMetadata: React.FC<MessageMetadataProps> = ({ modelUsed, inputToken
     if (typeof inputTokens === 'number') tokenParts.push(`${inputTokens} in`);
     if (typeof outputTokens === 'number') tokenParts.push(`${outputTokens} out`);
 
-    if (!modelUsed && !generationTime && tokenParts.length === 0 && !timestamp) {
+    const hasModelInfo = modelUsed || (generationTime && generationTime > 0);
+
+    if (!hasModelInfo && !timestamp && tokenParts.length === 0) {
         return null;
     }
 
@@ -25,46 +27,54 @@ const MessageMetadata: React.FC<MessageMetadataProps> = ({ modelUsed, inputToken
                         </div>
                     } 
                     position="bottom"
+                    align="left"
                 >
                     <span className="cursor-help">Tokens: {tokenParts.join(' / ')}</span>
                 </Tooltip>
             )}
-            <div className="flex items-center gap-x-4 gap-y-1 flex-wrap">
-                {modelUsed && <ModelInfoDisplay modelId={modelUsed} />}
-                {generationTime && generationTime > 0 && (
-                    <Tooltip 
-                        content={
-                            <div>
-                                <div>Total time from request to</div>
-                                <div>full response</div>
-                            </div>
-                        } 
-                        position="bottom"
-                    >
-                        <span className="cursor-help">{`${(generationTime / 1000).toFixed(1)}s`}</span>
-                    </Tooltip>
-                )}
-                {timestamp && (
-                    <Tooltip
-                        content={
-                            <div>
-                                <div>Response timestamp</div>
-                                <div>{new Date(timestamp).toISOString()}</div>
-                            </div>
-                        }
-                        position="bottom"
-                    >
-                        <span className="cursor-help">
-                            {new Date(timestamp).toLocaleString(undefined, {
-                                month: 'short',
-                                day: 'numeric',
-                                hour: 'numeric',
-                                minute: '2-digit'
-                            })}
-                        </span>
-                    </Tooltip>
-                )}
-            </div>
+            {hasModelInfo && (
+                <div className="flex items-center gap-x-4 gap-y-1 flex-wrap">
+                    {modelUsed && <ModelInfoDisplay modelId={modelUsed} />}
+                    {generationTime && generationTime > 0 && (
+                        <Tooltip 
+                            content={
+                                <div>
+                                    <div>Total time from request to</div>
+                                    <div>full response</div>
+                                </div>
+                            } 
+                            position="bottom"
+                            align="left"
+                        >
+                            <span className="cursor-help">{`${(generationTime / 1000).toFixed(1)}s`}</span>
+                        </Tooltip>
+                    )}
+                </div>
+            )}
+            {timestamp && (
+                <Tooltip
+                    content={
+                        <div>
+                            <div>Response generated at:</div>
+                            <div>{new Date(timestamp).toLocaleString(undefined, {
+                                dateStyle: 'full',
+                                timeStyle: 'medium',
+                            })}</div>
+                        </div>
+                    }
+                    position="bottom"
+                    align="left"
+                >
+                    <span className="cursor-help">
+                        {new Date(timestamp).toLocaleString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit'
+                        })}
+                    </span>
+                </Tooltip>
+            )}
         </div>
     );
 };

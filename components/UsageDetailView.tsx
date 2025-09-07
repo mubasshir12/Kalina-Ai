@@ -1,14 +1,17 @@
 import React, { useMemo } from 'react';
 import { Conversation, ChatMessage } from '../types';
 import { ArrowLeft, MessageSquareText, Zap } from 'lucide-react';
+import Tooltip from './Tooltip';
 
-interface UsageDetailViewProps {
-    conversation: Conversation | undefined;
-    onBack: () => void;
-    onViewConvoDetails: (convoPair: { user: ChatMessage; model: ChatMessage; serialNumber: number }) => void;
-}
+const formatTokens = (num: number): string => {
+    if (num < 1000) return num.toString();
+    const suffixes = ["", "K", "M", "B", "T"];
+    const i = Math.floor(Math.log(num) / Math.log(1000));
+    if (i >= suffixes.length) return num.toExponential(1);
+    return `${parseFloat((num / Math.pow(1000, i)).toFixed(1))}${suffixes[i]}`;
+};
 
-const formatTokens = (num: number): string => new Intl.NumberFormat().format(num);
+const formatNumber = (num: number) => new Intl.NumberFormat().format(num);
 
 const truncateText = (text: string, start = 40, end = 20): string => {
     if (!text) return 'No text content';
@@ -16,6 +19,12 @@ const truncateText = (text: string, start = 40, end = 20): string => {
     if (cleanedText.length <= start + end) return cleanedText;
     return `${cleanedText.slice(0, start)}...${cleanedText.slice(-end)}`;
 };
+
+interface UsageDetailViewProps {
+    conversation: Conversation | undefined;
+    onBack: () => void;
+    onViewConvoDetails: (convoPair: { user: ChatMessage; model: ChatMessage; serialNumber: number }) => void;
+}
 
 const UsageDetailView: React.FC<UsageDetailViewProps> = ({ conversation, onBack, onViewConvoDetails }) => {
 
@@ -80,10 +89,12 @@ const UsageDetailView: React.FC<UsageDetailViewProps> = ({ conversation, onBack,
                                             <p className="text-sm text-neutral-500 dark:text-gray-400 truncate">"{truncateText(model.content)}"</p>
                                         </div>
                                         <div className="flex-shrink-0 text-right">
-                                            <p className="text-lg font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-                                                <Zap className="w-4 h-4" />
-                                                {formatTokens(totalTokens)}
-                                            </p>
+                                            <Tooltip content={<><strong>Total:</strong> {formatNumber(totalTokens)} tokens</>} position="top" align="right">
+                                                <p className="text-lg font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 cursor-help">
+                                                    <Zap className="w-4 h-4" />
+                                                    {formatTokens(totalTokens)}
+                                                </p>
+                                            </Tooltip>
                                             <p className="text-xs text-neutral-400 dark:text-gray-500">Tokens</p>
                                         </div>
                                     </div>

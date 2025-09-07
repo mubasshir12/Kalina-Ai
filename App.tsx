@@ -126,7 +126,7 @@ const App: React.FC = () => {
             setNavigatorIndex(targetIndex);
             const element = document.getElementById(`message-${targetIndex}`);
             if (element) {
-                scrollContainer.scrollTo({ top: element.offsetTop, behavior: 'smooth' });
+                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         } else if (direction === 'down' && targetIndex === messageIndices.length - 1) {
             scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
@@ -335,7 +335,7 @@ const App: React.FC = () => {
 
     return (
         <>
-            <div className="relative flex flex-col h-[100dvh] bg-[#F9F6F2] dark:bg-transparent text-neutral-800 dark:text-white transition-colors duration-300">
+            <div className="relative flex flex-col h-[100dvh] bg-[#F9F6F2] dark:bg-transparent text-neutral-800 dark:text-white transition-colors duration-300 overflow-hidden">
                 <div className="absolute inset-0 z-0">
                     {isDarkMode ? <ParticleUniverse /> : <Globe />}
                 </div>
