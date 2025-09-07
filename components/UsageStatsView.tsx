@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { Conversation } from '../types';
 import { ArrowLeft, MessageSquareText, LogIn, LogOut, Cpu, Languages } from 'lucide-react';
@@ -7,6 +8,7 @@ interface UsageStatsViewProps {
     conversations: Conversation[];
     translatorUsage: { input: number, output: number };
     onBack: () => void;
+    onViewDetails: (conversationId: string) => void;
 }
 
 // New formatter for large numbers
@@ -38,7 +40,7 @@ const StatCard: React.FC<{ icon?: React.ElementType, label: string, value: numbe
 );
 
 
-const UsageStatsView: React.FC<UsageStatsViewProps> = ({ conversations, translatorUsage, onBack }) => {
+const UsageStatsView: React.FC<UsageStatsViewProps> = ({ conversations, translatorUsage, onBack, onViewDetails }) => {
     
     const { grandTotal, conversationStats, translatorTotal } = useMemo(() => {
         const chatTotal = { input: 0, output: 0, system: 0, total: 0, messageCount: 0 };
@@ -148,7 +150,7 @@ const UsageStatsView: React.FC<UsageStatsViewProps> = ({ conversations, translat
                     <h2 className="text-xl font-semibold text-neutral-800 dark:text-gray-200 mb-4">Chat Conversation Breakdown</h2>
                     <div className="space-y-3">
                         {conversationStats.map(stats => (
-                             <div key={stats.id} className="bg-white/80 dark:bg-[#1e1f22]/80 backdrop-blur-sm rounded-xl p-4 border border-neutral-200 dark:border-gray-700">
+                             <button key={stats.id} onClick={() => onViewDetails(stats.id)} className="w-full text-left bg-white/80 dark:bg-[#1e1f22]/80 backdrop-blur-sm rounded-xl p-4 border border-neutral-200 dark:border-gray-700 hover:border-amber-400 dark:hover:border-amber-500 hover:bg-white dark:hover:bg-[#2E2F33] transition-all duration-200">
                                 <div className="flex justify-between items-start mb-2">
                                     <div>
                                         <p className="font-medium text-neutral-800 dark:text-gray-200 line-clamp-1">{stats.title}</p>
@@ -174,7 +176,7 @@ const UsageStatsView: React.FC<UsageStatsViewProps> = ({ conversations, translat
                                         </Tooltip>
                                     </div>
                                 </div>
-                            </div>
+                            </button>
                         ))}
                          {conversationStats.length === 0 && (
                              <div className="text-center text-neutral-500 dark:text-gray-400 py-12 px-4 bg-white/80 dark:bg-[#1e1f22]/80 backdrop-blur-sm rounded-xl border border-dashed border-neutral-300 dark:border-gray-700">

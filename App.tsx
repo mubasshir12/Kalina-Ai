@@ -58,6 +58,11 @@ const App: React.FC = () => {
     const [isConsoleOpen, setIsConsoleOpen] = useState(false);
     const [consoleMode, setConsoleMode] = useState<ConsoleMode>('auto');
 
+    // State for Usage Detail Views
+    const [viewingUsageConvoId, setViewingUsageConvoId] = useState<string | null>(null);
+    const [viewingConvo, setViewingConvo] = useState<{ user: ChatMessage; model: ChatMessage; serialNumber: number } | null>(null);
+
+
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const conversationManager = useConversations();
@@ -316,6 +321,16 @@ const App: React.FC = () => {
         }));
     }, []);
     
+    const handleViewUsageDetails = (conversationId: string) => {
+        setViewingUsageConvoId(conversationId);
+        setCurrentView('usage-detail');
+    };
+
+    const handleViewConvoDetails = (convoPair: { user: ChatMessage; model: ChatMessage; serialNumber: number }) => {
+        setViewingConvo(convoPair);
+        setCurrentView('convo-detail');
+    };
+    
     const showConsoleToggleButton = consoleMode === 'manual' || (consoleMode === 'auto' && logs.length > 0);
 
     return (
@@ -360,6 +375,10 @@ const App: React.FC = () => {
                     onTranslationComplete={handleTranslationComplete}
                     setModalImage={setModalImage}
                     setCodeForPreview={setCodeForPreview}
+                    viewingUsageConvoId={viewingUsageConvoId}
+                    onViewUsageDetails={handleViewUsageDetails}
+                    viewingConvo={viewingConvo}
+                    onViewConvoDetails={handleViewConvoDetails}
                 />
 
                 {currentView === 'chat' && (

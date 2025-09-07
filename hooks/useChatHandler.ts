@@ -1,10 +1,10 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Content, Part } from '@google/ai';
+import { Content, Part } from '@google/ai-sdk/ai';
 import { ChatMessage as ChatMessageType, Suggestion, ChatModel, LTM, CodeSnippet, GroundingChunk, UserProfile, Tool, Conversation } from '../types';
 import { getAiClient } from '../services/aiClient';
 import { startChatSession, buildSystemInstruction } from '../services/chatService';
 import { planResponse } from '../services/geminiService';
-import { updateMemory, summarizeConversation } from '../services/memoryService';
+import { updateMemory, generateConvoSummaries } from '../services/memoryService';
 import { processAndSaveCode, findRelevantCode } from '../services/codeService';
 import * as urlReaderService from '../services/urlReaderService';
 import { getFriendlyErrorMessage } from '../utils/errorUtils';
@@ -138,6 +138,7 @@ export const useChatHandler = ({
                         id: crypto.randomUUID(),
                         role: 'model',
                         content: '*Response generation stopped.*',
+                        timestamp: new Date().toISOString(),
                     });
                 }
 
@@ -158,7 +159,7 @@ export const useChatHandler = ({
 
         if (!currentConversationId) {
             const newId = crypto.randomUUID();
-            conversationForThisTurn = { id: newId, title: "New Chat", messages: [] };
+            conversationForThisTurn = { id: newId, title: "New Chat", messages: [], summaries: [] };
             setConversations(prev => [conversationForThisTurn, ...prev]);
             setActiveConversationId(newId);
             currentConversationId = newId;
@@ -186,10 +187,10 @@ export const useChatHandler = ({
             setElapsedTime(elapsed);
         }, 53);
 
-        const planningMessage: ChatMessageType = { id: crypto.randomUUID(), role: 'model', content: '', isPlanning: true, modelUsed: modelToUse };
+        const planningMessage: ChatMessageType = { id: crypto.randomUUID(), role: 'model', content: '', isPlanning: true, modelUsed: modelToUse, timestamp: new Date().toISOString() };
         
         if (!isRetry) {
-            const newUserMessage: ChatMessageType = { id: crypto.randomUUID(), role: 'user', content: fullPrompt, images: images, file: file, modelUsed: modelToUse };
+            const newUserMessage: ChatMessageType = { id: crypto.randomUUID(), role: 'user', content: fullPrompt, images: images, file: file, modelUsed: modelToUse, timestamp: new Date().toISOString() };
             updateConversationMessages(currentConversationId, prev => [...prev, newUserMessage, planningMessage]);
         } else {
             updateConversationMessages(currentConversationId, prev => [...prev, planningMessage]);
@@ -332,7 +333,7 @@ export const useChatHandler = ({
             }
 
             const historyMessages = conversationForThisTurn.messages;
-            const summary = conversationForThisTurn.summary;
+            const summaries = conversationForThisTurn.summaries;
 
             let retrievedCodeSnippets: CodeSnippet[] = [];
             if (plan.needsCodeContext && codeMemory.length > 0) {
@@ -354,7 +355,7 @@ export const useChatHandler = ({
             if (isWebSearchEnabled) {
                 const ai = getAiClient();
                 const systemInstruction = buildSystemInstruction(
-                    isFirstTurnInConversation, modelName, ltm, userProfile, summary, retrievedCodeSnippets, developerContext, personaContext, capabilitiesContext
+                    isFirstTurnInConversation, modelName, ltm, userProfile, summaries, retrievedCodeSnippets, developerContext, personaContext, capabilitiesContext
                 );
                 const history = transformMessagesToHistory(historyMessages);
                 const contents = [...history, { role: 'user', parts: userMessageParts }];
@@ -370,8 +371,9 @@ export const useChatHandler = ({
             } else {
                 const chat = startChatSession(
                     modelToUse, isThinkingEnabled, modelName, ltm, userProfile, isFirstTurnInConversation, 
-                    transformMessagesToHistory(historyMessages), summary, retrievedCodeSnippets, developerContext, personaContext, capabilitiesContext
+                    transformMessagesToHistory(historyMessages), summaries, retrievedCodeSnippets, developerContext, personaContext, capabilitiesContext
                 );
+                // FIX: The `sendMessageStream` method expects an object with a `message` property, not a direct array of parts.
                 stream = await chat.sendMessageStream({ message: userMessageParts });
             }
             
@@ -433,7 +435,7 @@ export const useChatHandler = ({
                         return updatedMessages;
                     }
                     // This case handles adding the very first model message chunk
-                    return [...prevMessages, { id: crypto.randomUUID(), role: 'model', content: displayContent, sources }];
+                    return [...prevMessages, { id: crypto.randomUUID(), role: 'model', content: displayContent, sources, timestamp: new Date().toISOString() }];
                 });
             }
 
@@ -465,10 +467,24 @@ export const useChatHandler = ({
             const finalCleanedResponse = finalModelResponse.replace(/^\s*TITLE:\s*[^\n]*\n?/, '');
             const finalConversationState = conversations.find(c => c.id === currentConversationId);
             if (finalConversationState && !isCancelledRef.current) {
-                 // Generate episodic summary every ~15 turns (30 messages)
-                if (finalConversationState.messages.length > 1 && finalConversationState.messages.length % 30 === 0) {
-                    summarizeConversation(transformMessagesToHistory(finalConversationState.messages.slice(-30)), finalConversationState.summary)
-                        .then(newSummary => updateConversation(currentConversationId, c => ({...c, summary: newSummary })));
+                 // New 'convo' summarization logic
+                if (finalConversationState.messages.length > 0 && finalConversationState.messages.length % 20 === 0) {
+                    const convosToSummarize = [];
+                    const recentMessages = finalConversationState.messages.slice(-20);
+                    for (let i = 0; i < recentMessages.length; i += 2) {
+                        if (recentMessages[i].role === 'user' && recentMessages[i+1]?.role === 'model') {
+                            convosToSummarize.push({ user: recentMessages[i], model: recentMessages[i+1] });
+                        }
+                    }
+                    if (convosToSummarize.length > 0) {
+                        generateConvoSummaries(convosToSummarize, finalConversationState.summaries?.length || 0)
+                            .then(newSummaries => {
+                                updateConversation(currentConversationId, c => ({
+                                    ...c,
+                                    summaries: [...(c.summaries || []), ...newSummaries]
+                                }));
+                            });
+                    }
                 }
 
                 const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
@@ -532,9 +548,10 @@ export const useChatHandler = ({
                 if (prev.length === 0) return prev;
                 const newMessages = [...prev];
                 const lastMessage = newMessages[newMessages.length - 1];
-                newMessages[newMessages.length - 1] = { ...lastMessage, isPlanning: false, toolInUse: undefined, content: `Sorry, I encountered an error: ${friendlyError.message}` };
                 if (lastMessage.role === 'user') {
-                    newMessages.push({ id: crypto.randomUUID(), role: 'model', content: `Sorry, I encountered an error: ${friendlyError.message}` });
+                    newMessages.push({ id: crypto.randomUUID(), role: 'model', content: `Sorry, I encountered an error: ${friendlyError.message}`, timestamp: new Date().toISOString() });
+                } else {
+                     newMessages[newMessages.length - 1] = { ...lastMessage, isPlanning: false, toolInUse: undefined, content: `Sorry, I encountered an error: ${friendlyError.message}` };
                 }
                 return newMessages;
             });

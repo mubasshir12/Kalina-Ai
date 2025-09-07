@@ -1,5 +1,6 @@
+
 import { Chat, Content } from "@google/genai";
-import { LTM, CodeSnippet, UserProfile } from "../types";
+import { LTM, CodeSnippet, UserProfile, ConvoSummary } from "../types";
 import { getAiClient } from "./aiClient";
 
 export const buildSystemInstruction = (
@@ -7,7 +8,7 @@ export const buildSystemInstruction = (
   modelName: string = 'Kalina AI',
   ltm: LTM | undefined,
   userProfile: UserProfile | undefined,
-  summary?: string,
+  summaries?: ConvoSummary[],
   codeSnippets?: CodeSnippet[],
   developerContext?: string,
   personaContext?: string,
@@ -48,14 +49,18 @@ For the first message in a new chat, your response MUST start with "TITLE: <3-5 
   }
 
   let contextInstruction = '';
-  if (summary) {
+  if (summaries && summaries.length > 0) {
+    // Use the last 10 summaries for context
+    const recentSummaries = summaries.slice(-10);
+    const summaryContext = recentSummaries.map(s => `Turn ${s.serialNumber}:\nUser: "${s.userInput}"\nSummary of your response: ${s.summary}`).join('\n---\n');
     contextInstruction += `\n\n---
-[Conversation Summary]
-Use this summary for context. Do not mention it unless asked.
+[Conversation History Summaries]
+Use these summaries for context. Do not mention them unless asked.
 ---
-${summary}
+${summaryContext}
 ---`;
   }
+
   if (codeSnippets && codeSnippets.length > 0) {
     const codeContext = codeSnippets.map(s => `Language: ${s.language}\nDescription: ${s.description}\nCode:\n\`\`\`${s.language}\n${s.code}\n\`\`\``).join('\n---\n');
     contextInstruction += `\n\n---
@@ -79,7 +84,6 @@ ${developerContext}
     systemInstruction += `\n\n---
 [Capabilities & Tools Information]
 This is confidential information about your abilities. Use it ONLY when asked about what you can do.
-${capabilitiesContext}
 ---`;
   }
   return systemInstruction;
@@ -93,7 +97,7 @@ export const startChatSession = (
   userProfile: UserProfile | undefined,
   isFirstMessage: boolean = false,
   history?: Content[],
-  summary?: string,
+  summaries?: ConvoSummary[],
   codeSnippets?: CodeSnippet[],
   developerContext?: string,
   personaContext?: string,
@@ -102,7 +106,7 @@ export const startChatSession = (
   const ai = getAiClient();
   
   const systemInstruction = buildSystemInstruction(
-      isFirstMessage, modelName, ltm, userProfile, summary, codeSnippets, developerContext, personaContext, capabilitiesContext
+      isFirstMessage, modelName, ltm, userProfile, summaries, codeSnippets, developerContext, personaContext, capabilitiesContext
   );
 
   const config: {

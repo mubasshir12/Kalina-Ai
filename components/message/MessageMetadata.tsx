@@ -1,21 +1,16 @@
 import React from 'react';
-import { ChatModel } from '../../types';
+import { ChatModel, ChatMessage } from '../../types';
 import ModelInfoDisplay from './ModelInfoDisplay';
 import Tooltip from '../Tooltip';
 
-interface MessageMetadataProps {
-    modelUsed?: ChatModel;
-    inputTokens?: number;
-    outputTokens?: number;
-    generationTime?: number;
-}
+interface MessageMetadataProps extends Pick<ChatMessage, 'modelUsed' | 'inputTokens' | 'outputTokens' | 'generationTime' | 'timestamp'> {}
 
-const MessageMetadata: React.FC<MessageMetadataProps> = ({ modelUsed, inputTokens, outputTokens, generationTime }) => {
+const MessageMetadata: React.FC<MessageMetadataProps> = ({ modelUsed, inputTokens, outputTokens, generationTime, timestamp }) => {
     const tokenParts: string[] = [];
     if (typeof inputTokens === 'number') tokenParts.push(`${inputTokens} in`);
     if (typeof outputTokens === 'number') tokenParts.push(`${outputTokens} out`);
 
-    if (!modelUsed && !generationTime && tokenParts.length === 0) {
+    if (!modelUsed && !generationTime && tokenParts.length === 0 && !timestamp) {
         return null;
     }
 
@@ -47,6 +42,26 @@ const MessageMetadata: React.FC<MessageMetadataProps> = ({ modelUsed, inputToken
                         position="bottom"
                     >
                         <span className="cursor-help">{`${(generationTime / 1000).toFixed(1)}s`}</span>
+                    </Tooltip>
+                )}
+                {timestamp && (
+                    <Tooltip
+                        content={
+                            <div>
+                                <div>Response timestamp</div>
+                                <div>{new Date(timestamp).toISOString()}</div>
+                            </div>
+                        }
+                        position="bottom"
+                    >
+                        <span className="cursor-help">
+                            {new Date(timestamp).toLocaleString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit'
+                            })}
+                        </span>
                     </Tooltip>
                 )}
             </div>

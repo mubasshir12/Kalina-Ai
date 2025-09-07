@@ -1,6 +1,6 @@
 
 import { Content, Type } from "@google/genai";
-import { LTM, UserProfile } from "../types";
+import { LTM, UserProfile, ChatMessage, ConvoSummary } from "../types";
 import { getAiClient } from "./aiClient";
 
 const getMemoryUpdateSystemInstruction = (userName: string | null): string => `You are a selective memory AI. Your goal is to extract, update, and manage long-term facts about the user.
@@ -109,20 +109,23 @@ Analyze the conversation and LTM, then generate the JSON output as instructed.`;
     }
 };
 
-export const summarizeConversation = async (
-    history: Content[],
-    previousSummary?: string
-): Promise<string> => {
+export const generateConvoSummaries = async (
+    convos: { user: ChatMessage, model: ChatMessage }[],
+    startingSerialNumber: number
+): Promise<ConvoSummary[]> => {
     const ai = getAiClient();
-    const systemInstruction = `You are an expert conversation summarizer for an AI's memory. Create a concise summary of recent conversation turns, integrating new info with any previous summary.
-Focus on:
-1. User's GOAL.
-2. Key AI decisions (tools used).
-3. Final OUTCOME.
-Format as bullet points. Respond ONLY with the summary text.`;
+    const systemInstruction = `You are a conversation summarizer. For each user/AI convo pair provided, create a concise 4-5 line summary of the AI's response. Extract the user's original input text.
+Respond ONLY with a valid JSON array matching the schema.`;
+
+    const convoText = convos.map((convo, index) => 
+        `---
+Convo Index: ${index}
+User Input: "${convo.user.content}"
+AI Response: "${convo.model.content}"
+---`
+    ).join('\n');
     
-    const historyText = history.map(h => `${h.role}: ${h.parts.map(p => (p as any).text || '').join(' ')}`).join('\n');
-    const prompt = `PREVIOUS SUMMARY:\n${previousSummary || 'None'}\n\nRECENT CONVERSATION:\n${historyText}\n\nBased on the above, provide an updated summary.`;
+    const prompt = `Generate summaries for the following conversation pairs:\n${convoText}`;
 
     try {
         const response = await ai.models.generateContent({
@@ -130,11 +133,43 @@ Format as bullet points. Respond ONLY with the summary text.`;
             contents: prompt,
             config: {
                 systemInstruction: systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            convo_index: { type: Type.INTEGER },
+                            user_input: { type: Type.STRING },
+                            summary: { type: Type.STRING }
+                        },
+                        required: ["convo_index", "user_input", "summary"]
+                    }
+                }
             }
         });
-        return response.text.trim();
+        const jsonText = response.text.trim();
+        const summariesData: { convo_index: number; user_input: string; summary: string; }[] = JSON.parse(jsonText);
+
+        return summariesData.map((data): ConvoSummary | null => {
+            const originalConvo = convos[data.convo_index];
+            if (!originalConvo) return null;
+
+            return {
+                id: crypto.randomUUID(),
+                userMessageId: originalConvo.user.id,
+                modelMessageId: originalConvo.model.id,
+                serialNumber: startingSerialNumber + data.convo_index + 1,
+                userInput: data.user_input,
+                summary: data.summary,
+            };
+            // FIX: Add explicit return type to the map callback to satisfy the type predicate in the filter.
+            // This ensures the object's inferred type with a specific UUID string for `id` is compatible with
+            // the `ConvoSummary` type which expects a general `string`.
+        }).filter((s): s is ConvoSummary => s !== null);
+
     } catch (error) {
-        console.error("Error summarizing conversation:", error);
-        return previousSummary || ''; // Return old summary on error
+        console.error("Error generating convo summaries:", error);
+        return [];
     }
 };

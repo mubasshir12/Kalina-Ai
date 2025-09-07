@@ -1,10 +1,12 @@
 import React from 'react';
-import { Conversation, LTM, Suggestion, View } from '../types';
+import { Conversation, LTM, Suggestion, View, ChatMessage } from '../types';
 import ChatHistory from './ChatHistory';
 import WelcomeScreen from './WelcomeScreen';
 import MemoryManagement from './MemoryManagement';
 import TranslatorView from './Translator';
 import UsageStatsView from './UsageStatsView';
+import UsageDetailView from './UsageDetailView';
+import ConvoDetailView from './ConvoDetailView';
 
 interface ViewRendererProps {
     currentView: View;
@@ -28,6 +30,10 @@ interface ViewRendererProps {
     onTranslationComplete: (tokens: { input: number; output: number }) => void;
     setModalImage: (url: string | null) => void;
     setCodeForPreview: (data: { code: string; language: string; } | null) => void;
+    viewingUsageConvoId: string | null;
+    onViewUsageDetails: (conversationId: string) => void;
+    viewingConvo: { user: ChatMessage; model: ChatMessage; serialNumber: number } | null;
+    onViewConvoDetails: (convoPair: { user: ChatMessage; model: ChatMessage; serialNumber: number }) => void;
 }
 
 const ViewRenderer: React.FC<ViewRendererProps> = ({
@@ -52,6 +58,10 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
     onTranslationComplete,
     setModalImage,
     setCodeForPreview,
+    viewingUsageConvoId,
+    onViewUsageDetails,
+    viewingConvo,
+    onViewConvoDetails
 }) => {
 
     switch (currentView) {
@@ -66,7 +76,12 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
         case 'translator':
             return <TranslatorView onBack={onCloseTranslator} onTranslationComplete={onTranslationComplete} />;
         case 'usage':
-            return <UsageStatsView conversations={conversations} onBack={() => setCurrentView('chat')} translatorUsage={translatorUsage} />;
+            return <UsageStatsView conversations={conversations} onBack={() => setCurrentView('chat')} translatorUsage={translatorUsage} onViewDetails={onViewUsageDetails} />;
+        case 'usage-detail':
+            const conversationForDetail = conversations.find(c => c.id === viewingUsageConvoId);
+            return <UsageDetailView conversation={conversationForDetail} onBack={() => setCurrentView('usage')} onViewConvoDetails={onViewConvoDetails} />;
+        case 'convo-detail':
+            return <ConvoDetailView convoPair={viewingConvo} onBack={() => setCurrentView('usage-detail')} setCodeForPreview={setCodeForPreview} />;
         case 'chat':
         default:
             return (

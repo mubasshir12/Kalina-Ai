@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -66,8 +67,22 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'top', 
         }
     }, [isVisible, updatePosition]);
     
-    const handleMouseEnter = () => setIsVisible(true);
-    const handleMouseLeave = () => setIsVisible(false);
+    const handleMouseEnter = (e: React.MouseEvent) => {
+        // FIX: Cast children.props to `any` to safely access and call the original event handler.
+        // The `children` prop's type is too generic for TypeScript to know its props.
+        if (typeof (children.props as any).onMouseEnter === 'function') {
+            (children.props as any).onMouseEnter(e);
+        }
+        setIsVisible(true);
+    };
+
+    const handleMouseLeave = (e: React.MouseEvent) => {
+        // FIX: Cast children.props to `any` to safely access and call the original event handler.
+        if (typeof (children.props as any).onMouseLeave === 'function') {
+            (children.props as any).onMouseLeave(e);
+        }
+        setIsVisible(false);
+    };
     
     // The original logic for merging refs was flawed because `children.ref` is not a readable property.
     // This simplified callback only handles setting the tooltip's internal target ref.
@@ -76,11 +91,10 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'top', 
         (targetRef as React.MutableRefObject<HTMLElement | null>).current = node;
     }, []);
 
-    // FIX: Explicitly spread `children.props` to fix a TypeScript error with `cloneElement`.
-    // The `ref` property causes issues with TypeScript's type inference for generic `React.ReactElement`.
-    // Spreading existing props helps TypeScript correctly infer the types and allows adding the ref and event handlers.
-    const childWithProps = React.cloneElement(children, {
-        ...children.props,
+    // FIX: The type of `children` is `React.ReactElement`, which is too generic for TypeScript 
+    // to know if it can accept a `ref` or event handlers. Casting `children` to 
+    // `React.ReactElement<any>` tells TypeScript to allow these props, fixing the compile error.
+    const childWithProps = React.cloneElement(children as React.ReactElement<any>, {
         ref: handleRef,
         onMouseEnter: handleMouseEnter,
         onMouseLeave: handleMouseLeave,

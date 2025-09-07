@@ -2,7 +2,7 @@ import React from 'react';
 
 export type ChatModel = 'gemini-2.5-flash' | 'gemini-2.5-pro';
 export type Tool = 'smart' | 'webSearch' | 'thinking' | 'translator' | 'urlReader';
-export type View = 'chat' | 'memory' | 'translator' | 'usage';
+export type View = 'chat' | 'memory' | 'translator' | 'usage' | 'usage-detail' | 'convo-detail';
 
 export type MessageRole = 'user' | 'model';
 
@@ -31,6 +31,7 @@ export interface ChatMessage {
   id: string;
   role: MessageRole;
   content: string;
+  timestamp?: string; // Added to track message creation time
   images?: {
       base64: string;
       mimeType: string;
@@ -70,13 +71,22 @@ export interface Suggestion {
   icon?: React.ReactNode;
 }
 
+export interface ConvoSummary {
+  id: string;
+  userMessageId: string;
+  modelMessageId: string;
+  serialNumber: number;
+  userInput: string;
+  summary: string;
+}
+
 export interface Conversation {
   id: string;
   title: string;
   messages: ChatMessage[];
   isPinned?: boolean;
   isGeneratingTitle?: boolean;
-  summary?: string;
+  summaries?: ConvoSummary[];
 }
 
 // User Profile for persistent user-specific info.
