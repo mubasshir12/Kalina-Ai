@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Conversation } from '../types';
 import { ArrowLeft, MessageSquareText, LogIn, LogOut, Cpu, Languages } from 'lucide-react';
+import Tooltip from './Tooltip';
 
 interface UsageStatsViewProps {
     conversations: Conversation[];
@@ -8,7 +9,18 @@ interface UsageStatsViewProps {
     onBack: () => void;
 }
 
-const StatCard: React.FC<{ icon?: React.ElementType, label: string, value: string, colorClass: string, helpText: string }> = ({ icon: Icon, label, value, colorClass, helpText }) => (
+// New formatter for large numbers
+const formatTokens = (num: number): string => {
+    if (num < 1000) return num.toString();
+    const suffixes = ["", "K", "M", "B", "T"];
+    const i = Math.floor(Math.log(num) / Math.log(1000));
+    if (i >= suffixes.length) return num.toExponential(1);
+    return `${parseFloat((num / Math.pow(1000, i)).toFixed(1))}${suffixes[i]}`;
+};
+
+const formatNumber = (num: number) => new Intl.NumberFormat().format(num);
+
+const StatCard: React.FC<{ icon?: React.ElementType, label: string, value: number, colorClass: string, helpText: string }> = ({ icon: Icon, label, value, colorClass, helpText }) => (
     <div className="bg-white/80 dark:bg-[#2E2F33]/80 backdrop-blur-sm p-3 sm:p-4 rounded-xl flex items-center gap-2 sm:gap-4 border border-neutral-200 dark:border-gray-700/50">
         {Icon && (
             <div className={`p-2 sm:p-3 rounded-full ${colorClass} flex-shrink-0`}>
@@ -17,7 +29,9 @@ const StatCard: React.FC<{ icon?: React.ElementType, label: string, value: strin
         )}
         <div className="flex-1 overflow-hidden">
             <p className="text-xs sm:text-sm text-neutral-500 dark:text-gray-400 truncate">{label}</p>
-            <p className="text-lg sm:text-2xl font-bold text-neutral-800 dark:text-gray-200">{value}</p>
+            <Tooltip content={<><strong>{label}:</strong> {formatNumber(value)} tokens</>} position="top" align="center">
+                <p className="text-lg sm:text-2xl font-bold text-neutral-800 dark:text-gray-200 cursor-help">{formatTokens(value)}</p>
+            </Tooltip>
             <p className="text-[10px] sm:text-xs text-neutral-400 dark:text-gray-500 truncate">{helpText}</p>
         </div>
     </div>
@@ -70,12 +84,17 @@ const UsageStatsView: React.FC<UsageStatsViewProps> = ({ conversations, translat
         return { grandTotal, conversationStats, translatorTotal };
     }, [conversations, translatorUsage]);
 
-    const formatNumber = (num: number) => new Intl.NumberFormat().format(num);
-
     const totalPercentage = (value: number, total: number) => {
         if (total === 0) return '0%';
         return `${((value / total) * 100).toFixed(1)}%`;
     }
+    
+    const ProgressBarTooltipContent = ({ label, value, total }: { label: string, value: number, total: number }) => (
+        <div className="text-center">
+            <strong className="block">{label}</strong>
+            <span>{formatNumber(value)} tokens ({totalPercentage(value, total)})</span>
+        </div>
+    );
 
     return (
         <main className="relative z-10 flex-1 overflow-y-auto p-4 md:p-6">
@@ -92,27 +111,35 @@ const UsageStatsView: React.FC<UsageStatsViewProps> = ({ conversations, translat
                     <p className="text-sm text-neutral-500 dark:text-gray-400 mb-4">Total tokens used across all tools.</p>
                     
                     <div className="text-center mb-6">
-                        <p className="text-5xl font-extrabold text-amber-600 dark:text-amber-400">{formatNumber(grandTotal.total)}</p>
+                        <Tooltip content={<><strong>Total Tokens:</strong> {formatNumber(grandTotal.total)}</>} position="top" align="center">
+                             <p className="text-5xl font-extrabold text-amber-600 dark:text-amber-400 cursor-help">{formatTokens(grandTotal.total)}</p>
+                        </Tooltip>
                         <p className="text-sm font-medium text-neutral-500 dark:text-gray-400">Total Tokens</p>
                     </div>
                     <div className="w-full bg-neutral-200 dark:bg-gray-700 rounded-full h-3 mb-4">
                         <div className="flex h-3">
-                            <div className="bg-blue-500 rounded-l-full" style={{ width: totalPercentage(grandTotal.input, grandTotal.total) }} title={`Input: ${totalPercentage(grandTotal.input, grandTotal.total)}`}></div>
-                            <div className="bg-green-500" style={{ width: totalPercentage(grandTotal.output, grandTotal.total) }} title={`Output: ${totalPercentage(grandTotal.output, grandTotal.total)}`}></div>
-                            <div className="bg-yellow-500 rounded-r-full" style={{ width: totalPercentage(grandTotal.system, grandTotal.total) }} title={`System: ${totalPercentage(grandTotal.system, grandTotal.total)}`}></div>
+                            <Tooltip content={<ProgressBarTooltipContent label="Input" value={grandTotal.input} total={grandTotal.total} />}>
+                                <div className="bg-blue-500 rounded-l-full h-full" style={{ width: totalPercentage(grandTotal.input, grandTotal.total) }}></div>
+                            </Tooltip>
+                             <Tooltip content={<ProgressBarTooltipContent label="Output" value={grandTotal.output} total={grandTotal.total} />}>
+                                <div className="bg-green-500 h-full" style={{ width: totalPercentage(grandTotal.output, grandTotal.total) }}></div>
+                            </Tooltip>
+                            <Tooltip content={<ProgressBarTooltipContent label="System" value={grandTotal.system} total={grandTotal.total} />}>
+                                <div className="bg-yellow-500 rounded-r-full h-full" style={{ width: totalPercentage(grandTotal.system, grandTotal.total) }}></div>
+                            </Tooltip>
                         </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2 sm:gap-4">
-                        <StatCard label="Input" value={formatNumber(grandTotal.input)} helpText="User prompt tokens" colorClass="bg-blue-500" />
-                        <StatCard label="Output" value={formatNumber(grandTotal.output)} helpText="Model response tokens" colorClass="bg-green-500" />
-                        <StatCard label="System" value={formatNumber(grandTotal.system)} helpText="Instructions & context" colorClass="bg-yellow-500" />
+                        <StatCard label="Input" value={grandTotal.input} helpText="User prompt tokens" colorClass="bg-blue-500" />
+                        <StatCard label="Output" value={grandTotal.output} helpText="Model response tokens" colorClass="bg-green-500" />
+                        <StatCard label="System" value={grandTotal.system} helpText="Instructions & context" colorClass="bg-yellow-500" />
                     </div>
                 </div>
                 
                 {translatorTotal > 0 && (
                     <div className="mb-6">
                         <h2 className="text-xl font-semibold text-neutral-800 dark:text-gray-200 mb-2">Tool Usage</h2>
-                        <StatCard icon={Languages} label="Translator Tool" value={formatNumber(translatorTotal)} helpText="Total tokens used" colorClass="bg-purple-500" />
+                        <StatCard icon={Languages} label="Translator Tool" value={translatorTotal} helpText="Total tokens used" colorClass="bg-purple-500" />
                     </div>
                 )}
 
@@ -128,15 +155,23 @@ const UsageStatsView: React.FC<UsageStatsViewProps> = ({ conversations, translat
                                         <p className="text-xs text-neutral-500 dark:text-gray-400">{stats.messageCount} responses</p>
                                     </div>
                                     <div className="text-right flex-shrink-0 ml-4">
-                                        <p className="font-bold text-lg text-neutral-800 dark:text-gray-200">{formatNumber(stats.total)}</p>
+                                        <Tooltip content={<><strong>Total:</strong> {formatNumber(stats.total)} tokens</>} position="top" align="right">
+                                            <p className="font-bold text-lg text-neutral-800 dark:text-gray-200 cursor-help">{formatTokens(stats.total)}</p>
+                                        </Tooltip>
                                         <p className="text-xs text-neutral-500 dark:text-gray-400">Tokens</p>
                                     </div>
                                 </div>
                                 <div className="w-full bg-neutral-200 dark:bg-gray-700 rounded-full h-2">
                                     <div className="flex h-2">
-                                        <div className="bg-blue-500 rounded-l-full" style={{ width: totalPercentage(stats.input, stats.total) }} title={`Input: ${formatNumber(stats.input)}`}></div>
-                                        <div className="bg-green-500" style={{ width: totalPercentage(stats.output, stats.total) }} title={`Output: ${formatNumber(stats.output)}`}></div>
-                                        <div className="bg-yellow-500 rounded-r-full" style={{ width: totalPercentage(stats.system, stats.total) }} title={`System: ${formatNumber(stats.system)}`}></div>
+                                        <Tooltip content={<ProgressBarTooltipContent label="Input" value={stats.input} total={stats.total} />}>
+                                            <div className="bg-blue-500 rounded-l-full h-full" style={{ width: totalPercentage(stats.input, stats.total) }}></div>
+                                        </Tooltip>
+                                        <Tooltip content={<ProgressBarTooltipContent label="Output" value={stats.output} total={stats.total} />}>
+                                            <div className="bg-green-500 h-full" style={{ width: totalPercentage(stats.output, stats.total) }}></div>
+                                        </Tooltip>
+                                        <Tooltip content={<ProgressBarTooltipContent label="System" value={stats.system} total={stats.total} />}>
+                                            <div className="bg-yellow-500 rounded-r-full h-full" style={{ width: totalPercentage(stats.system, stats.total) }}></div>
+                                        </Tooltip>
                                     </div>
                                 </div>
                             </div>

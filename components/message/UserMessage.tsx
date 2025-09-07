@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage as ChatMessageType } from '../../types';
 import { X, Copy, Check, Pencil, File, FileText, Presentation } from 'lucide-react';
@@ -211,15 +212,19 @@ const UserMessage: React.FC<UserMessageProps> = ({
               )}
               {file && (
                   <div className="relative">
-                      {file.mimeType === 'application/pdf' ? (
-                          <a href={`data:${file.mimeType};base64,${file.base64}`} target="_blank" rel="noopener noreferrer">
-                              <div className="relative w-[200px] aspect-[16/9] bg-neutral-200 dark:bg-gray-800 rounded-2xl p-3 flex flex-col items-center justify-center gap-1 text-center hover:bg-neutral-300 dark:hover:bg-gray-700 transition-colors">
-                                  <FileText className="h-8 w-8 flex-shrink-0 text-red-500 dark:text-red-400" />
-                                  <span className="font-medium text-sm break-all text-neutral-700 dark:text-gray-300">{truncateFileName(file.name)}</span>
-                                  {file.size && <span className="text-xs text-neutral-500 dark:text-gray-400 mt-1">{formatFileSize(file.size)}</span>}
-                              </div>
-                          </a>
-                      ) : (
+                      {file.mimeType.includes('pdf') || file.mimeType.includes('plain') ? (() => {
+                          const isPdf = file.mimeType.includes('pdf');
+                          const iconColor = isPdf ? 'text-red-500 dark:text-red-400' : 'text-blue-500 dark:text-blue-400';
+                          return (
+                              <a href={`data:${file.mimeType};base64,${file.base64}`} target="_blank" rel="noopener noreferrer">
+                                  <div className="relative w-[200px] aspect-[16/9] bg-neutral-200 dark:bg-gray-800 rounded-2xl p-3 flex flex-col items-center justify-center gap-1 text-center hover:bg-neutral-300 dark:hover:bg-gray-700 transition-colors">
+                                      <FileText className={`h-8 w-8 flex-shrink-0 ${iconColor}`} />
+                                      <span className="font-medium text-sm break-all text-neutral-700 dark:text-gray-300">{truncateFileName(file.name)}</span>
+                                      {file.size && <span className="text-xs text-neutral-500 dark:text-gray-400 mt-1">{formatFileSize(file.size)}</span>}
+                                  </div>
+                              </a>
+                          );
+                      })() : (
                           <div className="max-w-[200px] p-2.5 rounded-2xl bg-amber-500 flex items-center gap-2.5 text-white">
                               <FileIcon mimeType={file.mimeType} />
                               <span className="font-medium truncate text-sm">{file.name}</span>
