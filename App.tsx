@@ -1,7 +1,5 @@
-
-
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Suggestion, Tool, ChatModel, ModelInfo, View, ConsoleMode } from './types';
+import { Suggestion, Tool, ChatModel, ModelInfo, View, ConsoleMode, ChatMessage } from './types';
 import { initializeAiClient } from './services/aiClient';
 import Header from './components/Header';
 import ChatInput from './components/ChatInput';
@@ -23,6 +21,7 @@ import Globe from './components/Globe';
 import ImageModal from './components/ImageModal';
 import CodePreviewModal from './components/CodePreviewModal';
 import { useScrollSpy } from './hooks/useScrollSpy';
+import { useMessagePositions } from './hooks/useMessagePositions';
 
 const models: ModelInfo[] = [
     { id: 'gemini-2.5-flash', name: 'Kalina 2.5 Flash', description: 'Optimized for speed and efficiency.' },
@@ -61,6 +60,7 @@ const App: React.FC = () => {
     const [consoleMode, setConsoleMode] = useState<ConsoleMode>('auto');
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const [thumbInfo, setThumbInfo] = useState({ top: 0, height: 100 });
 
     const conversationManager = useConversations();
     const { ltm, setLtm, codeMemory, setCodeMemory, userProfile, setUserProfile } = useMemory();
@@ -89,64 +89,90 @@ const App: React.FC = () => {
 
     const showWelcomeScreen = !activeConversation || activeConversation.messages.length === 0;
 
-    const userMessageIndices = useMemo(() => {
+    const messageIndices = useMemo(() => {
         if (!activeConversation) return [];
-        return activeConversation.messages.reduce((acc, msg, index) => {
-            if (msg.role === 'user') {
-                acc.push(index);
-            }
-            return acc;
-        }, [] as number[]);
+        return activeConversation.messages.map((_, index) => index);
     }, [activeConversation]);
 
-    // useScrollSpy detects the current message based on scroll position
-    const activeMessageIndex = useScrollSpy(scrollContainerRef, userMessageIndices);
+    const activeMessageIndex = useScrollSpy(scrollContainerRef, messageIndices);
+    const messagePositions = useMessagePositions(scrollContainerRef, messageIndices);
     
-    // Dedicated state for the navigator to prevent race conditions
     const [navigatorIndex, setNavigatorIndex] = useState<number | null>(null);
 
-    // Effect to sync the navigator's state with the scroll spy's detected position
     useEffect(() => {
         if (activeMessageIndex !== null) {
-            const indexInNavigator = userMessageIndices.indexOf(activeMessageIndex);
-            if (indexInNavigator !== -1) {
-                setNavigatorIndex(indexInNavigator);
-            }
-        } else if (userMessageIndices.length > 0) {
-            // Initialize to the last message if spy hasn't picked anything up
-            setNavigatorIndex(userMessageIndices.length - 1);
+            setNavigatorIndex(activeMessageIndex);
+        } else if (messageIndices.length > 0) {
+            setNavigatorIndex(messageIndices.length - 1);
         } else {
             setNavigatorIndex(null);
         }
-    }, [activeMessageIndex, userMessageIndices]);
+    }, [activeMessageIndex, messageIndices]);
+    
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
 
-    // Reworked handleNavigate to use its own state for reliability
+        const updateThumb = () => {
+            const { scrollTop, scrollHeight, clientHeight } = container;
+            if (scrollHeight <= clientHeight) {
+                setThumbInfo({ top: 0, height: 100 });
+                return;
+            }
+            const thumbHeight = (clientHeight / scrollHeight) * 100;
+            const thumbTop = (scrollTop / scrollHeight) * 100;
+            setThumbInfo({ top: thumbTop, height: thumbHeight });
+        };
+
+        updateThumb(); // Initial calculation
+
+        container.addEventListener('scroll', updateThumb, { passive: true });
+        
+        // Update on resize and content changes
+        const resizeObserver = new ResizeObserver(updateThumb);
+        resizeObserver.observe(container);
+
+        return () => {
+            container.removeEventListener('scroll', updateThumb);
+            resizeObserver.disconnect();
+        };
+    }, [activeConversation]);
+
     const handleNavigate = (direction: 'up' | 'down') => {
         const scrollContainer = scrollContainerRef.current;
-        if (!scrollContainer || navigatorIndex === null || userMessageIndices.length < 2) return;
+        if (!scrollContainer || navigatorIndex === null || messageIndices.length < 2) return;
 
-        let targetIndexInNavigator = navigatorIndex;
+        let targetIndex = navigatorIndex;
         if (direction === 'up') {
-            targetIndexInNavigator = Math.max(0, navigatorIndex - 1);
-        } else { // 'down'
-            targetIndexInNavigator = Math.min(userMessageIndices.length - 1, navigatorIndex + 1);
+            targetIndex = Math.max(0, navigatorIndex - 1);
+        } else {
+            targetIndex = Math.min(messageIndices.length - 1, navigatorIndex + 1);
         }
         
-        if (targetIndexInNavigator !== navigatorIndex) {
-            setNavigatorIndex(targetIndexInNavigator); // Update state immediately for next click
-            const targetMessageIndex = userMessageIndices[targetIndexInNavigator];
-            const element = document.getElementById(`message-${targetMessageIndex}`);
+        if (targetIndex !== navigatorIndex) {
+            setNavigatorIndex(targetIndex);
+            const element = document.getElementById(`message-${targetIndex}`);
             if (element) {
                 scrollContainer.scrollTo({ top: element.offsetTop, behavior: 'smooth' });
             }
-        } else if (direction === 'down' && targetIndexInNavigator === userMessageIndices.length - 1) {
-            // If at the last message and clicking down, scroll to the very bottom
+        } else if (direction === 'down' && targetIndex === messageIndices.length - 1) {
             scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
         }
     };
     
+    const handleJumpToMessage = (messageIndex: number) => {
+        const scrollContainer = scrollContainerRef.current;
+        if (!scrollContainer) return;
+        
+        const element = document.getElementById(`message-${messageIndex}`);
+        if (element) {
+            scrollContainer.scrollTo({ top: element.offsetTop, behavior: 'smooth' });
+            setNavigatorIndex(messageIndex);
+        }
+    };
+
     const isAtStart = navigatorIndex !== null && navigatorIndex === 0;
-    const isAtEnd = navigatorIndex !== null && userMessageIndices.length > 0 && navigatorIndex === userMessageIndices.length - 1;
+    const isAtEnd = navigatorIndex !== null && messageIndices.length > 0 && navigatorIndex === messageIndices.length - 1;
     
     useEffect(() => {
         const observer = new MutationObserver(() => {
@@ -240,10 +266,8 @@ const App: React.FC = () => {
         setTimeout(() => {
             if (scrollContainerRef.current) {
                 if (isFirstMessage) {
-                    // For the first message in a chat, scroll to the top to ensure the user's prompt is clearly visible below the header.
                     scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
                 } else {
-                    // For all subsequent messages, scroll to the bottom to show the latest response.
                     scrollContainerRef.current.scrollTo({
                         top: scrollContainerRef.current.scrollHeight,
                         behavior: 'smooth',
@@ -279,7 +303,6 @@ const App: React.FC = () => {
     const handleRetry = useCallback(() => {
         if (!activeConversation || activeConversation.messages.length === 0) return;
 
-        // FIX: Property 'findLastIndex' does not exist on type 'ChatMessage[]'. Replaced with a manual reverse loop for broader compatibility.
         let lastModelMessageIndex = -1;
         for (let i = activeConversation.messages.length - 1; i >= 0; i--) {
             if (activeConversation.messages[i].role === 'model') {
@@ -380,6 +403,11 @@ const App: React.FC = () => {
                     onTranslationComplete={handleTranslationComplete}
                     setModalImage={setModalImage}
                     setCodeForPreview={setCodeForPreview}
+                    messageIndices={messageIndices}
+                    activeMessageIndex={activeMessageIndex}
+                    onJumpToMessage={handleJumpToMessage}
+                    thumbInfo={thumbInfo}
+                    messagePositions={messagePositions}
                 />
 
                 {currentView === 'chat' && (
@@ -400,7 +428,7 @@ const App: React.FC = () => {
                                 onSelectChatModel={setSelectedChatModel}
                                 apiKey={apiKey}
                                 onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
-                                showConversationJumper={!showWelcomeScreen && userMessageIndices.length > 1}
+                                showConversationJumper={!showWelcomeScreen && messageIndices.length > 1}
                                 onNavigate={handleNavigate}
                                 isAtStartOfConversation={isAtStart}
                                 isAtEndOfConversation={isAtEnd}
@@ -426,7 +454,6 @@ const App: React.FC = () => {
                 )}
             </div>
             
-            {/* Modals are rendered here, outside the main scrolling container */}
             <ModelSwitchModal
                 isOpen={isModelSwitchModalOpen}
                 onClose={() => {

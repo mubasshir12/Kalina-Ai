@@ -1,50 +1,87 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export const useScrollSpy = (
     scrollContainerRef: React.RefObject<HTMLDivElement>,
-    userMessageIndices: number[]
+    messageIndices: number[]
 ): number | null => {
     const [activeMessageIndex, setActiveMessageIndex] = useState<number | null>(null);
+    // Use a ref to store the intersection ratio of each message element.
+    // This avoids re-renders and allows us to compare all visible elements.
+    const intersectionRatiosRef = useRef<Map<Element, number>>(new Map());
 
+    // This effect runs on initial load and when messages/conversation changes.
+    // It sets an initial reasonable active message.
     useEffect(() => {
-        // Set the initial active index to the last message when the component mounts or messages change.
-        if (userMessageIndices.length > 0) {
-            setActiveMessageIndex(userMessageIndices[userMessageIndices.length - 1]);
+        const container = scrollContainerRef.current;
+        if (messageIndices.length > 0) {
+            // If the content isn't scrollable, or on initial load, default to the last message.
+            if (!container || container.scrollHeight <= container.clientHeight) {
+                setActiveMessageIndex(messageIndices[messageIndices.length - 1]);
+            }
         } else {
             setActiveMessageIndex(null);
         }
-    }, [userMessageIndices]);
+        // Reset the ratios when the conversation changes
+        intersectionRatiosRef.current.clear();
+    }, [messageIndices, scrollContainerRef]);
 
     useEffect(() => {
-        if (!scrollContainerRef.current || userMessageIndices.length === 0) return;
+        const container = scrollContainerRef.current;
+        if (!container || messageIndices.length === 0) {
+            return;
+        }
+
+        const intersectionRatios = intersectionRatiosRef.current;
 
         const observer = new IntersectionObserver(
             (entries) => {
-                const visibleEntries = entries.filter(entry => entry.isIntersecting);
-                if (visibleEntries.length > 0) {
-                    // Find the entry that is highest up in the viewport
-                    const topmostEntry = visibleEntries.reduce((topmost, current) =>
-                        current.boundingClientRect.top < topmost.boundingClientRect.top ? current : topmost
-                    );
-                    const index = parseInt(topmostEntry.target.id.split('-')[1], 10);
-                    setActiveMessageIndex(index);
+                // 1. Update the ratios for all elements that triggered the observer
+                entries.forEach(entry => {
+                    intersectionRatios.set(entry.target, entry.intersectionRatio);
+                });
+
+                // 2. Find the element with the highest visibility ratio from our stored map
+                let bestTarget: Element | null = null;
+                let maxRatio = -1;
+
+                intersectionRatios.forEach((ratio, element) => {
+                    if (ratio > maxRatio) {
+                        maxRatio = ratio;
+                        bestTarget = element;
+                    }
+                });
+
+                // 3. If we found a best target, set it as the active index
+                if (bestTarget) {
+                    const index = parseInt(bestTarget.id.split('-')[1], 10);
+                    // Only update state if the active index has actually changed to avoid re-renders
+                    setActiveMessageIndex(prevIndex => prevIndex !== index ? index : prevIndex);
                 }
             },
             {
-                root: scrollContainerRef.current,
-                rootMargin: '0px 0px -50% 0px', // Trigger when an item is in the top half of the viewport
-                threshold: 0,
+                root: container,
+                // Create an array of many thresholds. This makes the observer fire
+                // frequently as an element's visibility changes, allowing us to
+                // always know which one is the *most* visible.
+                threshold: Array.from({ length: 101 }, (_, i) => i / 100), // [0, 0.01, 0.02, ..., 1]
             }
         );
 
-        const elements = userMessageIndices
+        const elements = messageIndices
             .map(index => document.getElementById(`message-${index}`))
             .filter((el): el is HTMLElement => el !== null);
 
-        elements.forEach(el => observer.observe(el));
+        elements.forEach(el => {
+            intersectionRatios.set(el, 0); // Initialize with 0
+            observer.observe(el);
+        });
 
-        return () => observer.disconnect();
-    }, [userMessageIndices, scrollContainerRef]);
+        return () => {
+            observer.disconnect();
+            // Clear the map on cleanup to prevent memory leaks with old elements.
+            intersectionRatios.clear();
+        };
+    }, [messageIndices, scrollContainerRef]);
 
     return activeMessageIndex;
 };
