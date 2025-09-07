@@ -1,0 +1,7 @@
+{
+  "name": "Stop generation fixed",
+  "description": "A sleek and modern chatbot interface powered by the Gemini API, featuring real-time streaming responses for a dynamic and interactive user experience.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

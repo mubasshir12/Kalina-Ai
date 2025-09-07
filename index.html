@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kalina AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // Enable class-based dark mode
+      tailwind.config = {
+        darkMode: 'class',
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-light.min.css" id="hljs-light-theme">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" id="hljs-dark-theme" disabled>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+      }
+      .scrollbar-hide {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+      }
+      .code-scrollbar::-webkit-scrollbar {
+        height: 8px;
+      }
+      .code-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .code-scrollbar::-webkit-scrollbar-thumb {
+        background-color: rgba(156, 163, 175, 0.5); /* gray-400 with opacity */
+        border-radius: 4px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+      }
+      .dark .code-scrollbar::-webkit-scrollbar-thumb {
+        background-color: rgba(107, 114, 128, 0.5); /* gray-500 with opacity */
+      }
+      .text-3d-effect {
+        /* A subtle shadow to give a slight lift */
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.15);
+      }
+      .dark .text-3d-effect {
+        /* A slightly more pronounced shadow might be needed in dark mode to be visible */
+        text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.25);
+      }
+      .image-reveal-container {
+        position: relative;
+        /* Hides the image by clipping it from the bottom, to reveal from bottom-to-top */
+        clip-path: inset(0 0 100% 0);
+        /* Animate the clip-path property over 1.5s for a smooth reveal */
+        transition: clip-path 1.5s cubic-bezier(0.25, 1, 0.5, 1);
+      }
+      .image-reveal-container.is-loaded {
+        /* Reveals the image by setting all insets to 0 */
+        clip-path: inset(0 0 0 0);
+      }
+    </style>
+    <script>
+      // On page load or when changing themes, best to add inline in `head` to avoid FOUC
+      const theme = localStorage.getItem('theme');
+      let isDark;
+
+      if (theme === 'dark') {
+          isDark = true;
+      } else if (theme === 'light') {
+          isDark = false;
+      } else { // This covers 'system' or theme not being set
+          isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+
+      if (isDark) {
+          document.documentElement.classList.add('dark');
+          document.getElementById('hljs-light-theme')?.setAttribute('disabled', 'true');
+          document.getElementById('hljs-dark-theme')?.removeAttribute('disabled');
+      } else {
+          document.documentElement.classList.remove('dark');
+          document.getElementById('hljs-light-theme')?.removeAttribute('disabled');
+          document.getElementById('hljs-dark-theme')?.setAttribute('disabled', 'true');
+      }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mozilla/readability@0.5.0/Readability.js"></script>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.16.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.417.0",
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.1.1",
+    "three": "https://unpkg.com/three@0.142.0/build/three.module.js",
+    "three/examples/jsm/controls/OrbitControls.js": "https://unpkg.com/three@0.142.0/examples/jsm/controls/OrbitControls.js",
+    "gsap": "https://unpkg.com/gsap@3.10.4/index.js",
+    "three/": "https://aistudiocdn.com/three@^0.179.1/"
+  }
+}
+</script>
+</head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
