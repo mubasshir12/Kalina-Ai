@@ -154,7 +154,7 @@ const ChatHistorySheet: React.FC<ChatHistorySheetProps> = ({
                             Chat History
                         </h2>
                         <button
-                            onClick={onNewChat}
+                            onClick={() => { onNewChat(); onClose(); }}
                             className="flex items-center gap-2 px-3 py-1.5 bg-amber-600 text-white font-semibold rounded-lg hover:bg-amber-700 transition-colors text-sm"
                             aria-label="Start new chat"
                         >
@@ -207,7 +207,7 @@ const ChatHistorySheet: React.FC<ChatHistorySheetProps> = ({
                                         </div>
                                     ) : (
                                         <button
-                                            onClick={() => onSelectConversation(convo.id)}
+                                            onClick={() => { onSelectConversation(convo.id); onClose(); }}
                                             className={`w-full text-left p-3 my-1 rounded-lg transition-colors flex items-center gap-3 ${
                                                 convo.id === activeConversationId
                                                     ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200'

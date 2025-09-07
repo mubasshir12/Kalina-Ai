@@ -113,23 +113,50 @@ const App: React.FC = () => {
     
     const handleNavigate = (direction: 'up' | 'down') => {
         const scrollContainer = scrollContainerRef.current;
-        if (!scrollContainer || navigatorIndex === null || messageIndices.length < 2) return;
+        if (!scrollContainer || navigatorIndex === null || !activeConversation) return;
 
-        let targetIndex = navigatorIndex;
-        if (direction === 'up') {
-            targetIndex = Math.max(0, navigatorIndex - 1);
-        } else {
-            targetIndex = Math.min(messageIndices.length - 1, navigatorIndex + 1);
-        }
+        const userMessageIndices = activeConversation.messages
+            .map((msg, index) => (msg.role === 'user' ? index : -1))
+            .filter(index => index !== -1);
         
-        if (targetIndex !== navigatorIndex) {
+        if (userMessageIndices.length < 1) return;
+
+        let targetIndex: number | undefined;
+
+        if (direction === 'down') {
+            targetIndex = userMessageIndices.find(i => i > navigatorIndex);
+            if (targetIndex === undefined) {
+                scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+                if (activeConversation.messages.length > 0) {
+                    setNavigatorIndex(activeConversation.messages.length - 1);
+                }
+                return;
+            }
+        } else { // 'up'
+            targetIndex = [...userMessageIndices].reverse().find(i => i < navigatorIndex);
+            if (targetIndex === undefined) {
+                scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+                setNavigatorIndex(0);
+                return;
+            }
+        }
+
+        if (targetIndex !== undefined) {
             setNavigatorIndex(targetIndex);
             const element = document.getElementById(`message-${targetIndex}`);
             if (element) {
-                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                const spacing = 16; // 1rem
+                const containerRect = scrollContainer.getBoundingClientRect();
+                const elementRect = element.getBoundingClientRect();
+                const scrollTop = scrollContainer.scrollTop;
+                
+                const targetScrollTop = scrollTop + (elementRect.top - containerRect.top) - spacing;
+
+                scrollContainer.scrollTo({
+                    top: targetScrollTop,
+                    behavior: 'smooth',
+                });
             }
-        } else if (direction === 'down' && targetIndex === messageIndices.length - 1) {
-            scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
         }
     };
     
