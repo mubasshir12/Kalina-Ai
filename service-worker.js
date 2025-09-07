@@ -1,7 +1,7 @@
 const CACHE_NAME = 'kalina-ai-cache-v1';
 const ASSETS_TO_CACHE = [
-    '/',
-    '/index.html'
+    './',
+    './index.html'
 ];
 
 self.addEventListener('install', (event) => {
