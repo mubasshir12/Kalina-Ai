@@ -7,7 +7,7 @@ import ModelSelector from './ModelSelector';
 import { compressImage } from '../utils/imageCompressor';
 
 interface ChatInputProps {
-  onSendMessage: (message: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; size: number; }) => void;
+  onSendMessage: (message: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; size: number; }, url?: string) => void;
   isLoading: boolean;
   elapsedTime: number;
   selectedTool: Tool;
@@ -168,13 +168,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
     };
 
   const handleSend = () => {
-    let messageToSend = input;
-    if (selectedTool === 'urlReader' && urlInput.trim()) {
-      messageToSend = `${urlInput.trim()}\n${input.trim()}`;
-    }
+    const messageToSend = input.trim();
+    const urlToSend = selectedTool === 'urlReader' ? urlInput.trim() : undefined;
 
-    if ((messageToSend.trim() || images.length > 0 || file) && !isLoading) {
-      onSendMessage(messageToSend, images.length > 0 ? images : undefined, file ?? undefined);
+    if ((messageToSend || images.length > 0 || file || urlToSend) && !isLoading) {
+      onSendMessage(messageToSend, images.length > 0 ? images : undefined, file ?? undefined, urlToSend);
       setInput('');
       setUrlInput('');
       setImages([]);

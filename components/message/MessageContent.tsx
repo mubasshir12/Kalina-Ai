@@ -89,7 +89,7 @@ const MessageContent: React.FC<MessageContentProps> = ({
                 isSearchingWeb ? <div className="flex justify-center items-center"><WebSearchAnimation plan={searchPlan} /></div> : <SkeletonLoader />
             )}
             
-            <div className="text-neutral-800 dark:text-gray-200 leading-relaxed">
+            <div className="text-neutral-800 dark:text-gray-200 leading-relaxed dark:blurry-text-effect">
             
             {content ? <MarkdownRenderer content={content} sources={sources} onContentUpdate={(newContent) => onUpdateMessageContent(id, newContent)} isStreaming={!!isStreaming} setCodeForPreview={setCodeForPreview} /> : null}
             

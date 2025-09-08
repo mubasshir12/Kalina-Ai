@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage as ChatMessageType } from '../../types';
-import { X, Copy, Check, Pencil, File, FileText, Presentation } from 'lucide-react';
+import { X, Copy, Check, Pencil, File, FileText, Presentation, Link } from 'lucide-react';
 import ImageAnalysisAnimation from '../ImageAnalysisAnimation';
 import FileAnalysisAnimation from '../FileAnalysisAnimation';
 
@@ -68,7 +68,8 @@ interface UserMessageProps extends ChatMessageType {
 const UserMessage: React.FC<UserMessageProps> = ({ 
     content, 
     images, 
-    file, 
+    file,
+    url,
     isAnalyzingImage,
     analysisCompleted,
     isAnalyzingFile,
@@ -178,6 +179,18 @@ const UserMessage: React.FC<UserMessageProps> = ({
   return (
       <div id={messageId} className="flex justify-end">
           <div className="flex flex-col items-end gap-2" onMouseDown={handlePressStart} onMouseUp={handlePressEnd} onMouseLeave={handlePressEnd} onTouchStart={handlePressStart} onTouchEnd={handlePressEnd} style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}>
+              {url && (
+                 <a 
+                    href={url.startsWith('http') ? url : `https://${url}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    onClick={(e) => e.stopPropagation()}
+                    className="max-w-[280px] sm:max-w-2xl w-full p-3 pr-4 rounded-2xl bg-amber-600/90 dark:bg-amber-600/80 backdrop-blur-sm text-white rounded-br-none flex items-center gap-3 shadow-md hover:bg-amber-600 transition-colors"
+                >
+                    <Link className="h-5 w-5 flex-shrink-0" />
+                    <span className="text-sm font-medium truncate flex-1">{url}</span>
+                </a>
+              )}
               {images && images.length > 0 && (
                   <div className="relative max-w-[250px] sm:max-w-xs w-full rounded-2xl overflow-hidden group shadow-md">
                       <div className="flex transition-transform duration-500 ease-in-out" style={{ transform: `translateX(-${currentIndex * 100}%)` }}>

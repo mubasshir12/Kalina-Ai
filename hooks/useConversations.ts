@@ -5,7 +5,15 @@ export const useConversations = () => {
     const [conversations, setConversations] = useState<Conversation[]>(() => {
         try {
             const storedConvos = localStorage.getItem('kalina_conversations');
-            return storedConvos ? JSON.parse(storedConvos) : [];
+            if (storedConvos) {
+                const parsedConvos: Conversation[] = JSON.parse(storedConvos);
+                // Migration: Add createdAt if missing
+                return parsedConvos.map(convo => ({
+                    ...convo,
+                    createdAt: convo.createdAt || new Date().toISOString()
+                }));
+            }
+            return [];
         } catch (e) {
             console.error("Failed to parse conversations from localStorage", e);
             return [];
@@ -58,6 +66,10 @@ export const useConversations = () => {
         return [...conversations].sort((a, b) => {
             if (a.isPinned && !b.isPinned) return -1;
             if (!a.isPinned && b.isPinned) return 1;
+            // If pinning is the same, sort by creation date, newest first
+            if (a.createdAt && b.createdAt) {
+                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+            }
             return 0;
         });
     }, [conversations]);
@@ -80,6 +92,7 @@ export const useConversations = () => {
             id: newConversationId,
             title: "New Chat",
             messages: [],
+            createdAt: new Date().toISOString(),
         };
 
         setConversations(prev => [newConversation, ...prev]);

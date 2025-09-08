@@ -40,7 +40,7 @@ const App: React.FC = () => {
     const [isHistorySheetOpen, setIsHistorySheetOpen] = useState(false);
     const [isStopConfirmOpen, setIsStopConfirmOpen] = useState(false);
     const [isModelSwitchModalOpen, setIsModelSwitchModalOpen] = useState(false);
-    const [pendingPrompt, setPendingPrompt] = useState<{ prompt: string; images?: { base64: string; mimeType: string; }[]; file?: { base64: string; mimeType: string; name: string; size: number; } } | null>(null);
+    const [pendingPrompt, setPendingPrompt] = useState<{ prompt: string; images?: { base64: string; mimeType: string; }[]; file?: { base64: string; mimeType: string; name: string; size: number; }; url?: string; } | null>(null);
     const [translatorUsage, setTranslatorUsage] = useState<{ input: number, output: number }>(() => {
         try {
             const storedUsage = localStorage.getItem('kalina_translator_usage');
@@ -249,11 +249,11 @@ const App: React.FC = () => {
         return codeKeywords.some(keyword => lowerText.includes(keyword.toLowerCase()));
     };
 
-    const executeSendMessage = useCallback((prompt: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; size: number; }, overrideModel?: ChatModel, isRetry = false) => {
+    const executeSendMessage = useCallback((prompt: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; size: number; }, url?: string, overrideModel?: ChatModel, isRetry = false) => {
         const convo = conversationManager.conversations.find(c => c.id === conversationManager.activeConversationId);
         const isFirstMessage = !convo || convo.messages.length === 0;
 
-        handleSendMessage(prompt, images, file, overrideModel, isRetry);
+        handleSendMessage(prompt, images, file, url, overrideModel, isRetry);
 
         setTimeout(() => {
             if (scrollContainerRef.current) {
@@ -269,25 +269,25 @@ const App: React.FC = () => {
         }, 100);
     }, [handleSendMessage, conversationManager.conversations, conversationManager.activeConversationId]);
 
-    const handleSendMessageWrapper = useCallback((prompt: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; size: number; }, isRetry = false) => {
+    const handleSendMessageWrapper = useCallback((prompt: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; size: number; }, url?: string, isRetry = false) => {
         if (selectedChatModel !== 'gemini-2.5-pro' && isCodeRelated(prompt) && !isRetry) {
-            setPendingPrompt({ prompt, images, file });
+            setPendingPrompt({ prompt, images, file, url });
             setIsModelSwitchModalOpen(true);
         } else {
-            executeSendMessage(prompt, images, file, undefined, isRetry);
+            executeSendMessage(prompt, images, file, url, undefined, isRetry);
         }
     }, [selectedChatModel, executeSendMessage]);
 
     const handleConfirmSwitch = () => {
         if (!pendingPrompt) return;
-        executeSendMessage(pendingPrompt.prompt, pendingPrompt.images, pendingPrompt.file, 'gemini-2.5-pro');
+        executeSendMessage(pendingPrompt.prompt, pendingPrompt.images, pendingPrompt.file, pendingPrompt.url, 'gemini-2.5-pro');
         setIsModelSwitchModalOpen(false);
         setPendingPrompt(null);
     };
 
     const handleDeclineSwitch = () => {
         if (!pendingPrompt) return;
-        executeSendMessage(pendingPrompt.prompt, pendingPrompt.images, pendingPrompt.file);
+        executeSendMessage(pendingPrompt.prompt, pendingPrompt.images, pendingPrompt.file, pendingPrompt.url);
         setIsModelSwitchModalOpen(false);
         setPendingPrompt(null);
     };
@@ -307,7 +307,7 @@ const App: React.FC = () => {
             const lastUserMessage = activeConversation.messages[lastModelMessageIndex - 1];
             if (lastUserMessage?.role === 'user') {
                 conversationManager.updateConversationMessages(activeConversation.id, prev => prev.slice(0, lastModelMessageIndex));
-                handleSendMessageWrapper(lastUserMessage.content, lastUserMessage.images, lastUserMessage.file, true);
+                handleSendMessageWrapper(lastUserMessage.content, lastUserMessage.images, lastUserMessage.file, lastUserMessage.url, true);
             }
         }
     }, [activeConversation, conversationManager, handleSendMessageWrapper]);
@@ -319,7 +319,7 @@ const App: React.FC = () => {
         if (messageToEdit.role !== 'user') return;
         
         conversationManager.updateConversationMessages(activeConversation.id, prev => prev.slice(0, index));
-        handleSendMessageWrapper(newContent, messageToEdit.images, messageToEdit.file);
+        handleSendMessageWrapper(newContent, messageToEdit.images, messageToEdit.file, messageToEdit.url);
     };
     
     const onConfirmCancelStream = () => {

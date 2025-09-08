@@ -61,6 +61,21 @@
         /* Reveals the image by setting all insets to 0 */
         clip-path: inset(0 0 0 0);
       }
+      .dark .blurry-text-effect p,
+      .dark .blurry-text-effect li,
+      .dark .blurry-text-effect h1,
+      .dark .blurry-text-effect h2,
+      .dark .blurry-text-effect h3,
+      .dark .blurry-text-effect h4,
+      .dark .blurry-text-effect h5,
+      .dark .blurry-text-effect h6 {
+        /* A more pronounced multi-layered shadow to create a soft, glassy glow behind the text, enhancing readability in dark mode. */
+        text-shadow: 0 0 8px rgba(255, 255, 255, 0.3), 0 0 24px rgba(255, 255, 255, 0.15);
+      }
+      .dark .blurry-text-effect code,
+      .dark .blurry-text-effect pre {
+        text-shadow: none !important;
+      }
     </style>
     <script>
       // On page load or when changing themes, best to add inline in `head` to avoid FOUC

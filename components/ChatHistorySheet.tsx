@@ -20,6 +20,30 @@ interface MenuConfig {
     rect: DOMRect | null;
 }
 
+const formatTimeAgo = (isoDateString?: string): string => {
+    if (!isoDateString) return '';
+
+    const now = new Date();
+    const date = new Date(isoDateString);
+    const seconds = Math.round((now.getTime() - date.getTime()) / 1000);
+
+    const minutes = Math.round(seconds / 60);
+    const hours = Math.round(seconds / 3600);
+    const days = Math.round(seconds / 86400);
+    const weeks = Math.round(seconds / 604800);
+    const months = Math.round(seconds / 2629800); // Approximation
+    const years = Math.round(seconds / 31557600); // Approximation
+
+    if (seconds < 60) return 'less than a min';
+    if (minutes < 60) return `${minutes} min ago`;
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    if (days < 7) return `${days} day${days > 1 ? 's' : ''} ago`;
+    if (weeks < 5) return `${weeks} week${weeks > 1 ? 's' : ''} ago`;
+    if (months < 12) return `${months} month${months > 1 ? 's' : ''} ago`;
+    
+    return `${years} year${years > 1 ? 's' : ''} ago`;
+};
+
 const ChatHistorySheet: React.FC<ChatHistorySheetProps> = ({
     isOpen,
     onClose,
@@ -139,7 +163,7 @@ const ChatHistorySheet: React.FC<ChatHistorySheetProps> = ({
                 ref={sheetRef}
                 className={`fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-[#1e1f22] rounded-t-2xl shadow-2xl transition-transform duration-300 ease-in-out ${
                     isOpen ? '' : 'translate-y-full'
-                } h-[40dvh] sm:h-auto sm:max-h-[60vh] flex flex-col`}
+                } h-[50dvh] sm:h-auto sm:max-h-[50vh] flex flex-col`}
                 style={isOpen ? sheetStyle : {}}
                 role="dialog"
                 aria-modal="true"
@@ -208,18 +232,21 @@ const ChatHistorySheet: React.FC<ChatHistorySheetProps> = ({
                                     ) : (
                                         <button
                                             onClick={() => { onSelectConversation(convo.id); onClose(); }}
-                                            className={`w-full text-left p-3 my-1 rounded-lg transition-colors flex items-center gap-3 ${
+                                            className={`w-full text-left p-3 my-1 rounded-lg transition-colors flex items-start gap-3 ${
                                                 convo.id === activeConversationId
                                                     ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200'
                                                     : 'text-neutral-700 dark:text-gray-300 hover:bg-neutral-100 dark:hover:bg-gray-800/60'
                                             }`}
                                         >
-                                            {convo.isPinned && <Pin className="h-4 w-4 text-amber-500 dark:text-amber-400 transform -rotate-45 flex-shrink-0 mr-1" />}
-                                            {convo.isGeneratingTitle ? (
-                                                 <div className="w-3/4 h-4 bg-neutral-200 dark:bg-gray-700 rounded-md animate-pulse"></div>
-                                            ) : (
-                                                 <span className="font-medium flex-1 break-words">{convo.title}</span>
-                                            )}
+                                            {convo.isPinned && <Pin className="h-4 w-4 text-amber-500 dark:text-amber-400 transform -rotate-45 flex-shrink-0 mt-1" />}
+                                            <div className="flex-1 min-w-0">
+                                                {convo.isGeneratingTitle ? (
+                                                     <div className="w-3/4 h-4 bg-neutral-200 dark:bg-gray-700 rounded-md animate-pulse"></div>
+                                                ) : (
+                                                     <span className="font-medium break-words">{convo.title}</span>
+                                                )}
+                                                <p className="text-xs text-neutral-400 dark:text-gray-500 mt-1 truncate">{formatTimeAgo(convo.createdAt)}</p>
+                                            </div>
                                         </button>
                                     )}
 

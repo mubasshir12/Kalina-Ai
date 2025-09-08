@@ -150,9 +150,9 @@ export const useChatHandler = ({
         }
     }, [activeConversationId, updateConversationMessages, clearThinkingIntervals, stopResponseTimer]);
 
-    const handleSendMessage = useCallback(async (prompt: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; size: number; }, overrideModel?: ChatModel, isRetry = false) => {
+    const handleSendMessage = useCallback(async (prompt: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; size: number; }, url?: string, overrideModel?: ChatModel, isRetry = false) => {
         const fullPrompt = prompt;
-        if ((!fullPrompt.trim() && !images && !file) || isLoading || !apiKey) return;
+        if ((!fullPrompt.trim() && !images && !file && !url) || isLoading || !apiKey) return;
 
         const modelToUse = overrideModel || selectedChatModel;
 
@@ -162,7 +162,8 @@ export const useChatHandler = ({
 
         if (!currentConversationId) {
             const newId = crypto.randomUUID();
-            conversationForThisTurn = { id: newId, title: "New Chat", messages: [], summaries: [] };
+            // FIX: Add the required 'createdAt' property when creating a new conversation to conform to the Conversation type.
+            conversationForThisTurn = { id: newId, title: "New Chat", messages: [], createdAt: new Date().toISOString(), summaries: [] };
             setConversations(prev => [conversationForThisTurn, ...prev]);
             setActiveConversationId(newId);
             currentConversationId = newId;
@@ -193,7 +194,7 @@ export const useChatHandler = ({
         const planningMessage: ChatMessageType = { id: crypto.randomUUID(), role: 'model', content: '', isPlanning: true, modelUsed: modelToUse, timestamp: new Date().toISOString() };
         
         if (!isRetry) {
-            const newUserMessage: ChatMessageType = { id: crypto.randomUUID(), role: 'user', content: fullPrompt, images: images, file: file, modelUsed: modelToUse, timestamp: new Date().toISOString() };
+            const newUserMessage: ChatMessageType = { id: crypto.randomUUID(), role: 'user', content: fullPrompt, images: images, file: file, url: url, modelUsed: modelToUse, timestamp: new Date().toISOString() };
             updateConversationMessages(currentConversationId, prev => [...prev, newUserMessage, planningMessage]);
         } else {
             updateConversationMessages(currentConversationId, prev => [...prev, planningMessage]);
@@ -283,15 +284,14 @@ export const useChatHandler = ({
 
             if (plan.isUrlReadRequest) {
                 toolInUse = 'url';
-                const urlMatch = fullPrompt.match(/(https?:\/\/[^\s]+)/);
-                if (!urlMatch) {
-                    return handleToolError("No valid URL found in your message.");
+                if (!url) {
+                    return handleToolError("No valid URL was provided for the URL Reader tool.");
                 }
                 updateConversationMessages(currentConversationId, prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, isPlanning: false, toolInUse } : m));
                 try {
-                    const cleanedContent = await urlReaderService.fetchAndParseUrlContent(urlMatch[0]);
+                    const cleanedContent = await urlReaderService.fetchAndParseUrlContent(url);
                      if (isCancelledRef.current) return;
-                    finalPromptForModel = `[URL: ${urlMatch[0]}]\n\n[EXTRACTED WEBPAGE CONTENT]:\n${cleanedContent}\n\n[USER QUESTION]:\n${fullPrompt}`;
+                    finalPromptForModel = `[URL: ${url}]\n\n[EXTRACTED WEBPAGE CONTENT]:\n${cleanedContent}\n\n[USER QUESTION]:\n${fullPrompt}`;
                 } catch (urlError: any) {
                     return handleToolError(urlError.message);
                 }

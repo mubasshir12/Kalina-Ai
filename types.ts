@@ -42,6 +42,7 @@ export interface ChatMessage {
       name: string;
       size: number;
   };
+  url?: string;
   modelUsed?: ChatModel;
   sources?: GroundingChunk[];
   thoughts?: ThoughtStep[];
@@ -84,6 +85,7 @@ export interface Conversation {
   id: string;
   title: string;
   messages: ChatMessage[];
+  createdAt: string;
   isPinned?: boolean;
   isGeneratingTitle?: boolean;
   summaries?: ConvoSummary[];
