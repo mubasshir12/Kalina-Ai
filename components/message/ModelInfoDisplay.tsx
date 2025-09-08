@@ -6,6 +6,9 @@ import { BrainCircuit, Zap } from 'lucide-react';
 const models: ModelInfo[] = [
     { id: 'gemini-2.5-flash', name: 'Kalina 2.5 Flash', description: 'Optimized for speed and efficiency.' },
     { id: 'gemini-2.5-pro', name: 'Kalina 2.5 Pro', description: 'Advanced capabilities for complex tasks.' },
+    { id: 'gemini-2.5-flash-lite', name: 'Kalina 2.5 Flash Lite', description: 'A lighter, faster version for quick responses.' },
+    { id: 'gemini-2.0-flash', name: 'Kalina 2.0 Flash', description: 'Previous generation Flash model.' },
+    { id: 'gemini-2.0-flash-lite', name: 'Kalina 2.0 Flash Lite', description: 'Lightweight version of the 2.0 Flash model.' },
 ];
 
 const ModelInfoDisplay: React.FC<{ modelId: ChatModel }> = ({ modelId }) => {

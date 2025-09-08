@@ -16,6 +16,9 @@ import { getCapabilitiesContext } from '../services/capabilitiesService';
 const models = [
     { id: 'gemini-2.5-flash', name: 'Kalina 2.5 Flash' },
     { id: 'gemini-2.5-pro', name: 'Kalina 2.5 Pro' },
+    { id: 'gemini-2.5-flash-lite', name: 'Kalina 2.5 Flash Lite' },
+    { id: 'gemini-2.0-flash', name: 'Kalina 2.0 Flash' },
+    { id: 'gemini-2.0-flash-lite', name: 'Kalina 2.0 Flash Lite' },
 ];
 
 const transformMessagesToHistory = (msgs: ChatMessageType[]): Content[] => {

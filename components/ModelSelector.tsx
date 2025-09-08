@@ -97,7 +97,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
                                 selectedChatModel === model.id ? 'bg-neutral-100 dark:bg-gray-700/70' : ''
                             }`}
                         >
-                            <p className="font-semibold text-sm">{model.name.replace('Kalina ', '')}</p>
+                            <p className="font-semibold text-sm">{model.name}</p>
                             <p className="text-xs text-neutral-500 dark:text-gray-400">{model.description}</p>
                         </button>
                     ))}
