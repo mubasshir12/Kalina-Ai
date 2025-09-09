@@ -7,6 +7,7 @@ import { planResponse } from '../services/geminiService';
 import { updateMemory, generateConvoSummaries } from '../services/memoryService';
 import { processAndSaveCode, findRelevantCode } from '../services/codeService';
 import * as urlReaderService from '../services/urlReaderService';
+import { getMoleculeData } from '../services/chemistryService';
 import { getFriendlyErrorMessage } from '../utils/errorUtils';
 import { useDebug } from '../contexts/DebugContext';
 import { developerProfile } from '../services/developerProfile';
@@ -231,6 +232,7 @@ export const useChatHandler = ({
                 'urlReader': () => { plan.isUrlReadRequest = true; isWebSearchEnabled = false; isThinkingEnabled = false; isImageAnalysisRequest = false; },
                 'thinking': () => { isThinkingEnabled = true; isWebSearchEnabled = false; plan.isUrlReadRequest = false; },
                 'webSearch': () => { isWebSearchEnabled = true; isThinkingEnabled = false; plan.isUrlReadRequest = false; isImageAnalysisRequest = false; },
+                'chemistry': () => { plan.isMoleculeRequest = true; isWebSearchEnabled = false; isThinkingEnabled = false; },
             };
             
             if (toolOverrides[selectedTool]) {
@@ -294,6 +296,38 @@ export const useChatHandler = ({
                     finalPromptForModel = `[URL: ${url}]\n\n[EXTRACTED WEBPAGE CONTENT]:\n${cleanedContent}\n\n[USER QUESTION]:\n${fullPrompt}`;
                 } catch (urlError: any) {
                     return handleToolError(urlError.message);
+                }
+            }
+
+            if (plan.isMoleculeRequest) {
+                const moleculeName = plan.moleculeName || fullPrompt;
+                updateConversationMessages(currentConversationId, prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, isPlanning: false, isMoleculeRequest: true } : m));
+                
+                try {
+                    const moleculeData = await getMoleculeData(moleculeName);
+                    if (isCancelledRef.current) return;
+                    
+                    updateConversationMessages(currentConversationId, prev => {
+                         const newMessages = [...prev];
+                         newMessages[newMessages.length - 1] = { ...newMessages[newMessages.length - 1], isMoleculeRequest: false, molecule: moleculeData };
+                         return newMessages;
+                    });
+                    
+                    finalPromptForModel = `I have successfully found and displayed the 3D model and key properties for ${moleculeName}. Now, please provide a brief, helpful description focusing on its common uses or significance.`;
+                    isWebSearchEnabled = false;
+                    isThinkingEnabled = false;
+
+                } catch (chemError: any) {
+                    logError(chemError);
+                    updateConversationMessages(currentConversationId, prev => {
+                         const newMessages = [...prev];
+                         const lastMsg = newMessages[newMessages.length - 1];
+                         newMessages[newMessages.length - 1] = { ...lastMsg, isMoleculeRequest: false, isPlanning: false, content: `Sorry, I couldn't find a 3D model for "${moleculeName}". Please check the spelling or try a different compound.` };
+                         return newMessages;
+                    });
+                    setIsLoading(false);
+                    stopResponseTimer();
+                    return;
                 }
             }
 

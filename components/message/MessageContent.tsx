@@ -4,6 +4,8 @@ import MarkdownRenderer from '../MarkdownRenderer';
 import ThinkingProcess from '../ThinkingProcess';
 import WebSearchAnimation from '../WebSearchAnimation';
 import UrlReaderAnimation from '../ToolUsageAnimation';
+import MoleculeViewer from '../MoleculeViewer';
+import MoleculeAnimation from '../MoleculeAnimation';
 import { Brain } from 'lucide-react';
 
 const SkeletonLoader: React.FC = () => (
@@ -47,6 +49,8 @@ const MessageContent: React.FC<MessageContentProps> = ({
     onUpdateMessageContent,
     setModalImage,
     setCodeForPreview,
+    isMoleculeRequest,
+    molecule,
 }) => {
     const showThinkingProcess = isThinking || (thoughts && thoughts.length > 0);
 
@@ -73,6 +77,8 @@ const MessageContent: React.FC<MessageContentProps> = ({
             {memoryUpdated && <MemoryUpdateNotification />}
 
             {isPlanning && <SkeletonLoader />}
+
+            {isMoleculeRequest && <MoleculeAnimation />}
             
             {!isPlanning && toolInUse && <UrlReaderAnimation isLongToolUse={isLongToolUse} />}
 
@@ -89,6 +95,8 @@ const MessageContent: React.FC<MessageContentProps> = ({
                 isSearchingWeb ? <div className="flex justify-center items-center"><WebSearchAnimation plan={searchPlan} /></div> : <SkeletonLoader />
             )}
             
+            {molecule && <MoleculeViewer molecule={molecule} />}
+
             <div className="text-neutral-800 dark:text-gray-200 leading-relaxed dark:blurry-text-effect">
             
             {content ? <MarkdownRenderer content={content} sources={sources} onContentUpdate={(newContent) => onUpdateMessageContent(id, newContent)} isStreaming={!!isStreaming} setCodeForPreview={setCodeForPreview} /> : null}

@@ -16,13 +16,16 @@ Set to true if the user asks who created you, your developer, or your origin.
 **4. Capabilities Inquiry (isCapabilitiesRequest: true):**
 Set to true if the user asks what you can do, about your tools, or your abilities (e.g., "what are your skills?", "can you generate images?").
 
-**5. File Analysis:**
+**5. Molecule Visualization (isMoleculeRequest: true):**
+Set to true if the user asks to see a 3D model or structure of a chemical compound (e.g., "show me water in 3D", "what does caffeine look like?"). Extract the name of the compound into \`moleculeName\`.
+
+**6. File Analysis:**
 - If a file is attached, always set 'needsThinking' to true.
 
-**6. Complex Prompts (needsThinking: true):**
+**7. Complex Prompts (needsThinking: true):**
 Set to true for prompts requiring analysis, creativity, multi-step reasoning, coding, or file analysis.
 
-**7. Simple Prompts (needsThinking: false):**
+**8. Simple Prompts (needsThinking: false):**
 Set to false for basic conversational turns.
 
 **Output:**
@@ -33,6 +36,8 @@ Respond ONLY with a valid JSON object based on the prompt analysis.
 - \`isUrlReadRequest\` (boolean): URL found and needs to be analyzed.
 - \`isCreatorRequest\` (boolean): User is asking about the developer.
 - \`isCapabilitiesRequest\` (boolean): User is asking about your abilities.
+- \`isMoleculeRequest\` (boolean): User is asking for a 3D model of a molecule.
+- \`moleculeName\` (string, optional): The name of the molecule if \`isMoleculeRequest\` is true.
 - \`needsThinking\` (boolean): Complex task.
 - \`needsCodeContext\` (boolean): Prompt relates to previous code.
 - \`thoughts\` (array, optional): If 'needsThinking' is true, provide a step-by-step plan.
@@ -53,6 +58,8 @@ export interface ResponsePlan {
     isCapabilitiesRequest: boolean;
     needsThinking: boolean;
     needsCodeContext: boolean;
+    isMoleculeRequest: boolean;
+    moleculeName?: string;
     thoughts: ThoughtStep[];
     searchPlan?: ThoughtStep[];
 }
@@ -81,6 +88,8 @@ export const planResponse = async (prompt: string, images?: { base64: string; mi
                         isUrlReadRequest: { type: Type.BOOLEAN },
                         isCreatorRequest: { type: Type.BOOLEAN },
                         isCapabilitiesRequest: { type: Type.BOOLEAN },
+                        isMoleculeRequest: { type: Type.BOOLEAN },
+                        moleculeName: { type: Type.STRING },
                         needsThinking: { type: Type.BOOLEAN },
                         needsCodeContext: { type: Type.BOOLEAN },
                         thoughts: {
@@ -108,7 +117,7 @@ export const planResponse = async (prompt: string, images?: { base64: string; mi
                             }
                         }
                     },
-                    required: ["needsWebSearch", "isUrlReadRequest", "isCreatorRequest", "isCapabilitiesRequest", "needsThinking", "needsCodeContext"],
+                    required: ["needsWebSearch", "isUrlReadRequest", "isCreatorRequest", "isCapabilitiesRequest", "needsThinking", "needsCodeContext", "isMoleculeRequest"],
                 }
             }
         });
@@ -116,7 +125,7 @@ export const planResponse = async (prompt: string, images?: { base64: string; mi
         const result = JSON.parse(jsonText);
 
         // If a tool-based request is made, disable general thinking to go straight to the task.
-        if (result.needsWebSearch || result.isUrlReadRequest) {
+        if (result.needsWebSearch || result.isUrlReadRequest || result.isMoleculeRequest) {
             result.needsThinking = false;
             result.thoughts = [];
         }
@@ -134,6 +143,7 @@ export const planResponse = async (prompt: string, images?: { base64: string; mi
             isCapabilitiesRequest: false,
             needsThinking: !needsWebSearch, // Ensures thinking is false if web search is true
             needsCodeContext: false, // <-- Changed from true to false for token efficiency on error
+            isMoleculeRequest: false,
             thoughts: [], // No thoughts when thinking is disabled
             searchPlan: []
         };

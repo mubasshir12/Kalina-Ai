@@ -1,7 +1,7 @@
 import React from 'react';
 
 export type ChatModel = 'gemini-2.5-flash' | 'gemini-2.5-pro' | 'gemini-2.5-flash-lite' | 'gemini-2.0-flash' | 'gemini-2.0-flash-lite';
-export type Tool = 'smart' | 'webSearch' | 'thinking' | 'translator' | 'urlReader';
+export type Tool = 'smart' | 'webSearch' | 'thinking' | 'translator' | 'urlReader' | 'chemistry';
 export type View = 'chat' | 'memory' | 'translator' | 'usage' | 'usage-detail' | 'convo-detail';
 
 export type MessageRole = 'user' | 'model';
@@ -25,6 +25,23 @@ export interface ThoughtStep {
   phase: string;
   step: string;
   concise_step: string;
+}
+
+export interface MoleculeData {
+    atoms: {
+        element: string;
+        x: number;
+        y: number;
+        z: number;
+    }[];
+    bonds: {
+        from: number;
+        to: number;
+        order: number;
+    }[];
+    molecularFormula?: string;
+    molecularWeight?: string;
+    iupacName?: string;
 }
 
 export interface ChatMessage {
@@ -60,6 +77,8 @@ export interface ChatMessage {
   // FIX: Add systemTokens to track tokens from system instructions, history, etc. This resolves an error in UsageStatsView.
   systemTokens?: number;
   generationTime?: number;
+  isMoleculeRequest?: boolean;
+  molecule?: MoleculeData;
 }
 
 export interface AppError {

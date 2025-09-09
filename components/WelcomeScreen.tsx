@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Lightbulb, BarChart3, Code2, BugPlay, DatabaseZap, HelpCircle, Mail, BookOpenText, GitCompareArrows, ChefHat, Share2, Presentation, Sparkles } from 'lucide-react';
+import { Lightbulb, BarChart3, Code2, BugPlay, DatabaseZap, HelpCircle, Mail, BookOpenText, GitCompareArrows, ChefHat, Share2, Presentation, Sparkles, FlaskConical } from 'lucide-react';
 import { Suggestion } from '../types';
 
 interface WelcomeScreenProps {
@@ -56,6 +56,21 @@ const allSuggestions: Suggestion[] = [
         text: "Compare and contrast",
         icon: <GitCompareArrows className="h-5 w-5 text-green-500" />,
         prompt: "Compare and contrast the pros and cons of React and Vue for web development."
+    },
+    {
+        text: "Visualize caffeine", 
+        icon: <FlaskConical className="h-5 w-5 text-emerald-500" />,
+        prompt: "Show me the 3D structure of caffeine"
+    },
+    { 
+        text: "Explain covalent bonds", 
+        icon: <FlaskConical className="h-5 w-5 text-emerald-500" />,
+        prompt: "Can you explain covalent bonds with an example?"
+    },
+    { 
+        text: "What is glucose?", 
+        icon: <FlaskConical className="h-5 w-5 text-emerald-500" />,
+        prompt: "What is the chemical formula for glucose and what is it used for?"
     },
     {
         text: "Get a recipe",

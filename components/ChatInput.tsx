@@ -1,10 +1,44 @@
 
+
 import React, { useState, KeyboardEvent, useRef, ChangeEvent, useEffect } from 'react';
 import { Suggestion, Tool, ChatModel, ModelInfo } from '../types';
-import { Sparkles, ChevronDown, X, Paperclip, ArrowUp, Globe, BrainCircuit, Image, Expand, File, Presentation, FileText, Camera, Languages, Link, ClipboardPaste, ChevronUp } from 'lucide-react';
+import { Sparkles, ChevronDown, X, Paperclip, ArrowUp, Globe, BrainCircuit, Image, Expand, File, Presentation, FileText, Camera, Languages, Link, ClipboardPaste, ChevronUp, Mic, FlaskConical } from 'lucide-react';
 import ImageModal from './ImageModal';
 import ModelSelector from './ModelSelector';
 import { compressImage } from '../utils/imageCompressor';
+import Tooltip from './Tooltip';
+
+// FIX: Add type definitions for the Web Speech API to resolve TypeScript errors for SpeechRecognition and SpeechRecognitionEvent.
+interface SpeechRecognition {
+    continuous: boolean;
+    interimResults: boolean;
+    lang: string;
+    onstart: () => void;
+    onend: () => void;
+    onerror: (event: { error: string }) => void;
+    onresult: (event: SpeechRecognitionEvent) => void;
+    start: () => void;
+    stop: () => void;
+}
+
+interface SpeechRecognitionEvent extends Event {
+    readonly resultIndex: number;
+    readonly results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+    readonly length: number;
+    [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+    readonly length: number;
+    [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+    readonly transcript: string;
+}
 
 interface ChatInputProps {
   onSendMessage: (message: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; size: number; }, url?: string) => void;
@@ -30,6 +64,7 @@ const tools: { id: Tool; name: string; description: string; icon: React.ElementT
     { id: 'smart', name: 'Smart Mode', description: 'Automatically uses the best tool for the job.', icon: Sparkles },
     { id: 'webSearch', name: 'Web Search', description: 'Searches the web for real-time info.', icon: Globe },
     { id: 'urlReader', name: 'URL Reader', description: 'Reads content from a web page URL.', icon: Link },
+    { id: 'chemistry', name: 'Chemistry', description: 'Visualize molecules and solve chemistry problems.', icon: FlaskConical },
     { id: 'thinking', name: 'Thinking', description: 'Shows the AI\'s step-by-step thought process.', icon: BrainCircuit },
     { id: 'translator', name: 'Translator', description: 'Translates text between languages.', icon: Languages },
 ];
@@ -75,6 +110,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [previewModalImage, setPreviewModalImage] = useState<string | null>(null);
   const [isProcessingAttachment, setIsProcessingAttachment] = useState(false);
   
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeechSupported, setIsSpeechSupported] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -85,6 +124,39 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const formatTime = (ms: number) => {
     if (!ms || ms < 0) return '0.0s';
     return `${(ms / 1000).toFixed(1)}s`;
+  };
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        setIsSpeechSupported(true);
+        const recognition: SpeechRecognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            setInput(prev => (prev ? prev.trim() + ' ' : '') + transcript);
+        };
+
+        recognition.onstart = () => setIsListening(true);
+        recognition.onend = () => setIsListening(false);
+        recognition.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            setIsListening(false);
+        };
+        recognitionRef.current = recognition;
+    }
+  }, []);
+
+  const handleToggleListening = () => {
+    if (!recognitionRef.current) return;
+    if (isListening) {
+        recognitionRef.current.stop();
+    } else {
+        recognitionRef.current.start();
+    }
   };
 
   useEffect(() => {
@@ -241,6 +313,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const SelectedIcon = selectedToolObject.icon;
   
   const placeholderText = () => {
+      if (isListening) return "Listening...";
       if (selectedTool === 'urlReader') return "Ask a question about the URL above...";
       if (images.length > 0) return `Ask a question about the ${images.length} image(s)...`;
       if (file) return `Ask a question about ${file.name}...`;
@@ -265,6 +338,21 @@ const ChatInput: React.FC<ChatInputProps> = ({
   
   // The button should be disabled for sending if attachments are processing or if there's no content.
   const isSendActionDisabled = isProcessingAttachment || (images.length === 0 && !file && !input.trim() && (selectedTool !== 'urlReader' || !urlInput.trim()));
+
+  const MicButton = () => (
+    <button
+        onClick={handleToggleListening}
+        disabled={isLoading || !isSpeechSupported}
+        className={`flex items-center justify-center w-10 h-10 p-2 rounded-full transition-all duration-200 ${
+            isListening 
+                ? 'bg-red-500 text-white animate-pulse' 
+                : 'text-neutral-600 dark:text-gray-300 hover:bg-neutral-300/50 dark:hover:bg-gray-700/70'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+        aria-label={isListening ? "Stop listening" : "Start voice input"}
+    >
+        <Mic className="h-6 w-6" />
+    </button>
+  );
 
   return (
     <>
@@ -342,7 +430,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                  <textarea ref={textareaRef} rows={1} value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={handleKeyPress} onPaste={handlePaste} placeholder={placeholderText()} disabled={isLoading} className="w-full bg-transparent text-neutral-800 dark:text-gray-200 placeholder:text-neutral-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-0 transition-all duration-300 disabled:opacity-50 resize-none max-h-[8rem] overflow-y-auto scrollbar-hide cursor-text" />
             </div>
             <div className="flex justify-between items-end mt-2">
-                <div className="flex items-end">
+                <div className="flex items-end gap-2">
                     {isProcessingAttachment ? (
                         <div className="flex items-center justify-center w-10 h-10">
                             <div className="w-6 h-6 border-2 border-neutral-400 border-t-amber-500 rounded-full animate-spin"></div>
@@ -397,6 +485,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
                                 </div>
                             )}
                         </div>
+                    )}
+
+                    {isSpeechSupported ? <MicButton /> : (
+                        <Tooltip content="Voice input is not supported on this browser.">
+                             <div className="flex items-center justify-center w-10 h-10">
+                                <MicButton />
+                            </div>
+                        </Tooltip>
                     )}
                 </div>
 
