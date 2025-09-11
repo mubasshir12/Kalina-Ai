@@ -11,14 +11,13 @@ interface ChatHistoryProps {
   isSearchingWeb: boolean;
   onRetry: () => void;
   onEditMessage: (index: number, newContent: string) => void;
-  onUpdateMessageContent: (messageId: string, newContent: string) => void;
   onCancelStream: () => void;
   scrollContainerRef: React.RefObject<HTMLDivElement>;
   setModalImage: (url: string | null) => void;
   setCodeForPreview: (data: { code: string; language: string; } | null) => void;
 }
 
-const ChatHistory: React.FC<ChatHistoryProps> = ({ messages, isLoading, isThinking, isSearchingWeb, onRetry, onEditMessage, onUpdateMessageContent, onCancelStream, scrollContainerRef, setModalImage, setCodeForPreview }) => {
+const ChatHistory: React.FC<ChatHistoryProps> = ({ messages, isLoading, isThinking, isSearchingWeb, onRetry, onEditMessage, onCancelStream, scrollContainerRef, setModalImage, setCodeForPreview }) => {
   const [isLockedToBottom, setIsLockedToBottom] = useState(true);
 
   // Effect to auto-scroll when new messages stream in, if the user is already at the bottom.
@@ -65,7 +64,6 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ messages, isLoading, isThinki
             onRetry={canRetry ? onRetry : undefined}
             index={index}
             onEditMessage={msg.role === 'user' ? onEditMessage : undefined}
-            onUpdateMessageContent={onUpdateMessageContent}
             onCancelStream={isStreamingNow ? onCancelStream : undefined}
             setModalImage={setModalImage}
             setCodeForPreview={setCodeForPreview}

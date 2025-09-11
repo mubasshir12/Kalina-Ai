@@ -1,7 +1,14 @@
-
 import { Content, Type } from "@google/genai";
 import { LTM, UserProfile, ChatMessage, ConvoSummary } from "../types";
 import { getAiClient } from "./aiClient";
+import { appLogger } from "./appLogger";
+
+const stripCodeBlocks = (text: string): string => {
+    if (!text) return '';
+    // Replace code blocks with a placeholder to signal their presence without including the content.
+    return text.replace(/```[\s\S]*?```/g, '[Code Block Removed]');
+};
+
 
 const getMemoryUpdateSystemInstruction = (userName: string | null): string => `You are a selective memory AI. Your goal is to extract, update, and manage long-term facts about the user.
 
@@ -10,18 +17,19 @@ const getMemoryUpdateSystemInstruction = (userName: string | null): string => `Y
 
 **Core Tasks:**
 1.  **Extract User Name:** If the user provides a new name, capture it in 'user_profile_updates'.
-2.  **Extract New Facts:** Identify new, stable, personal facts about the user.
+2.  **Extract New Facts:** Identify new, stable, personal facts about the user (e.g., preferences, personal history, relationships, goals).
 3.  **Update Existing Facts:** If new info contradicts an existing fact in 'CURRENT LTM', create an update operation specifying the 'old_memory' and 'new_memory'.
 4.  **Prioritize New Name:** When a new name is found, use it immediately in all new/updated facts in the same response. If no new name, use the current one or "The user" if unknown.
 5.  **Handle Explicit Saves:** If the user says "remember..." or "save...", you MUST save the specified info as a new fact, overriding other filters.
 
 **Critical Filter (unless an explicit save command):**
 - **SAVE:** Long-term, personal facts about the user.
-- **IGNORE:** General knowledge, temporary interests, or transactional details.
+- **IGNORE:** General knowledge, temporary interests, questions, summaries of the conversation, transactional details (e.g., "I just finished my coffee"), or information not directly about the user.
 
 **Rules:**
 - Do not add duplicate facts (rephrased info).
 - Do not add facts that contradict old ones; use an 'update' instead.
+- All facts should be written from a third-person perspective (e.g., "The user's favorite color is blue," not "My favorite color is blue").
 
 **Output:**
 Respond ONLY with a valid JSON object matching the provided schema.`;
@@ -46,7 +54,11 @@ export const updateMemory = async (
 ): Promise<MemoryUpdateResult> => {
     const ai = getAiClient();
     const historyString = lastMessages.map(m => {
-        const textParts = m.parts.map(p => (p as any).text || '[non-text part]').join(' ');
+        const textParts = m.parts.map(p => {
+            const text = (p as any).text || '[non-text part]';
+            // Strip code blocks from model responses before sending for analysis
+            return m.role === 'model' ? stripCodeBlocks(text) : text;
+        }).join(' ');
         return `${m.role}: ${textParts}`;
     }).join('\n');
     
@@ -104,7 +116,7 @@ Analyze the conversation and LTM, then generate the JSON output as instructed.`;
             userProfileUpdates: parsed.user_profile_updates || {}
         };
     } catch (error) {
-        console.error("Error updating memory:", error);
+        appLogger.error("Memory update API request failed", error);
         return { newMemories: [], updatedMemories: [], userProfileUpdates: {} };
     }
 };
@@ -163,9 +175,6 @@ AI Response: "${convo.model.content}"
                 userInput: data.user_input,
                 summary: data.summary,
             };
-            // FIX: Add explicit return type to the map callback to satisfy the type predicate in the filter.
-            // This ensures the object's inferred type with a specific UUID string for `id` is compatible with
-            // the `ConvoSummary` type which expects a general `string`.
         }).filter((s): s is ConvoSummary => s !== null);
 
     } catch (error) {

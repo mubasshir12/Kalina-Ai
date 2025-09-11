@@ -1,7 +1,11 @@
 import { Part, Type } from "@google/genai";
 import { getAiClient } from "./aiClient";
+import { PlannerContextItem } from "../types";
 
 const planAndThinkSystemInstruction = `You are an AI planner. Analyze the user's prompt to determine the best response strategy by classifying it. Your primary goal is to distinguish between web search, URL read, complex, and simple prompts.
+
+**Context:**
+If a "[RECENT CONVERSATION CONTEXT]" section is provided, you MUST use it to understand ambiguous follow-up questions. For example, if the context shows the last question was about "the weather in London" and the new prompt is just "what about tomorrow?", you should understand the user is asking about tomorrow's weather in London.
 
 **1. Web Search (needsWebSearch: true):**
 Set to true for queries needing real-time or up-to-date info (news, current events, live data like stock prices or weather, or the current time/date).
@@ -64,10 +68,20 @@ export interface ResponsePlan {
     searchPlan?: ThoughtStep[];
 }
 
-export const planResponse = async (prompt: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; }, model: string = 'gemini-2.5-flash'): Promise<ResponsePlan> => {
+export const planResponse = async (prompt: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; }, model: string = 'gemini-2.5-flash', plannerContext?: PlannerContextItem[]): Promise<ResponsePlan> => {
     const ai = getAiClient();
     try {
-        const contentParts: Part[] = [{ text: prompt }];
+        let fullPrompt = prompt;
+
+        if (plannerContext && plannerContext.length > 0) {
+            const contextString = plannerContext.map(item => 
+                `Turn ${item.serialNumber} (${item.serialNumber === 1 ? 'Most Recent' : ''}):\nUser: "${item.userSummary}"\nAI: "${item.aiSummary}"`
+            ).join('\n---\n');
+
+            fullPrompt = `[RECENT CONVERSATION CONTEXT]\n${contextString}\n[END CONTEXT]\n\nCurrent User Prompt:\n${prompt}`;
+        }
+
+        const contentParts: Part[] = [{ text: fullPrompt }];
         if (images && images.length > 0) {
             contentParts.unshift({ text: `[User has attached ${images.length} image(s)]` });
         }

@@ -2,7 +2,7 @@ import React from 'react';
 
 export type ChatModel = 'gemini-2.5-flash' | 'gemini-2.5-pro' | 'gemini-2.5-flash-lite' | 'gemini-2.0-flash' | 'gemini-2.0-flash-lite';
 export type Tool = 'smart' | 'webSearch' | 'thinking' | 'translator' | 'urlReader' | 'chemistry';
-export type View = 'chat' | 'memory' | 'translator' | 'usage' | 'usage-detail' | 'convo-detail';
+export type View = 'chat' | 'memory' | 'translator' | 'usage' | 'usage-detail' | 'convo-detail' | 'editor' | 'image-editor';
 
 export type MessageRole = 'user' | 'model';
 
@@ -44,6 +44,14 @@ export interface MoleculeData {
     iupacName?: string;
 }
 
+// Fix: Add and export the 'Location' interface for use in the InteractiveMap component.
+export interface Location {
+    lat: number;
+    lon: number;
+    name?: string;
+    details?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;
@@ -74,7 +82,6 @@ export interface ChatMessage {
   memoryUpdated?: boolean;
   inputTokens?: number; // User prompt tokens
   outputTokens?: number; // Model response tokens
-  // FIX: Add systemTokens to track tokens from system instructions, history, etc. This resolves an error in UsageStatsView.
   systemTokens?: number;
   generationTime?: number;
   isMoleculeRequest?: boolean;
@@ -100,6 +107,13 @@ export interface ConvoSummary {
   summary: string;
 }
 
+export interface PlannerContextItem {
+  id: string;
+  serialNumber: number;
+  userSummary: string;
+  aiSummary: string;
+}
+
 export interface Conversation {
   id: string;
   title: string;
@@ -108,6 +122,7 @@ export interface Conversation {
   isPinned?: boolean;
   isGeneratingTitle?: boolean;
   summaries?: ConvoSummary[];
+  plannerContext?: PlannerContextItem[];
 }
 
 // User Profile for persistent user-specific info.
@@ -137,14 +152,7 @@ export type ConsoleMode = 'auto' | 'manual';
 export interface ConsoleLogEntry {
     id: string;
     timestamp: string;
+    level: 'log' | 'warn' | 'error';
     message: string;
     stack?: string;
-}
-
-// FIX: Add Location interface for the InteractiveMap component.
-export interface Location {
-    lat: number;
-    lon: number;
-    name?: string;
-    details?: string;
 }

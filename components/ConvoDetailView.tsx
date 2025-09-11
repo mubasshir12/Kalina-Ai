@@ -102,7 +102,6 @@ const ConvoDetailView: React.FC<ConvoDetailViewProps> = ({ convoPair, onBack, se
                              <MarkdownRenderer 
                                 content={model.content} 
                                 sources={model.sources}
-                                onContentUpdate={() => {}}
                                 isStreaming={false}
                                 setCodeForPreview={setCodeForPreview}
                             />

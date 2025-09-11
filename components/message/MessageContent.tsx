@@ -28,7 +28,6 @@ interface MessageContentProps extends ChatMessageType {
     isStreaming?: boolean;
     isThinking?: boolean;
     isSearchingWeb?: boolean;
-    onUpdateMessageContent: (messageId: string, newContent: string) => void;
     setCodeForPreview: (data: { code: string; language: string; } | null) => void;
 }
 
@@ -46,7 +45,6 @@ const MessageContent: React.FC<MessageContentProps> = ({
     searchPlan,
     thinkingDuration,
     memoryUpdated,
-    onUpdateMessageContent,
     setModalImage,
     setCodeForPreview,
     isMoleculeRequest,
@@ -99,7 +97,7 @@ const MessageContent: React.FC<MessageContentProps> = ({
 
             <div className="text-neutral-800 dark:text-gray-200 leading-relaxed dark:blurry-text-effect">
             
-            {content ? <MarkdownRenderer content={content} sources={sources} onContentUpdate={(newContent) => onUpdateMessageContent(id, newContent)} isStreaming={!!isStreaming} setCodeForPreview={setCodeForPreview} /> : null}
+            {content ? <MarkdownRenderer content={content} sources={sources} isStreaming={!!isStreaming} setCodeForPreview={setCodeForPreview} /> : null}
             
             {isStreaming && content ? <span className="inline-block w-2 h-4 bg-neutral-800 dark:bg-white animate-pulse ml-1" /> : null}
             </div>

@@ -10,7 +10,6 @@ interface ChatMessageProps extends ChatMessageType {
   onRetry?: () => void;
   index: number;
   onEditMessage?: (index: number, newContent: string) => void;
-  onUpdateMessageContent: (messageId: string, newContent: string) => void;
   onCancelStream?: () => void;
   setModalImage: (url: string | null) => void;
   setCodeForPreview: (data: { code: string; language: string; } | null) => void;

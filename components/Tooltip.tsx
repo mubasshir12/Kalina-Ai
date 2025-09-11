@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -68,8 +69,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'top', 
     }, [isVisible, updatePosition]);
     
     const handleMouseEnter = (e: React.MouseEvent) => {
-        // FIX: Cast children.props to `any` to safely access and call the original event handler.
-        // The `children` prop's type is too generic for TypeScript to know its props.
+        // Cast children.props to `any` to safely access and call the original event handler.
         if (typeof (children.props as any).onMouseEnter === 'function') {
             (children.props as any).onMouseEnter(e);
         }
@@ -77,7 +77,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'top', 
     };
 
     const handleMouseLeave = (e: React.MouseEvent) => {
-        // FIX: Cast children.props to `any` to safely access and call the original event handler.
+        // Cast children.props to `any` to safely access and call the original event handler.
         if (typeof (children.props as any).onMouseLeave === 'function') {
             (children.props as any).onMouseLeave(e);
         }
@@ -91,9 +91,6 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'top', 
         (targetRef as React.MutableRefObject<HTMLElement | null>).current = node;
     }, []);
 
-    // FIX: The type of `children` is `React.ReactElement`, which is too generic for TypeScript 
-    // to know if it can accept a `ref` or event handlers. Casting `children` to 
-    // `React.ReactElement<any>` tells TypeScript to allow these props, fixing the compile error.
     const childWithProps = React.cloneElement(children as React.ReactElement<any>, {
         ref: handleRef,
         onMouseEnter: handleMouseEnter,

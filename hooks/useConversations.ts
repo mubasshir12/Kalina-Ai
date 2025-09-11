@@ -7,10 +7,11 @@ export const useConversations = () => {
             const storedConvos = localStorage.getItem('kalina_conversations');
             if (storedConvos) {
                 const parsedConvos: Conversation[] = JSON.parse(storedConvos);
-                // Migration: Add createdAt if missing
+                // Migration: Add createdAt and plannerContext if missing
                 return parsedConvos.map(convo => ({
                     ...convo,
-                    createdAt: convo.createdAt || new Date().toISOString()
+                    createdAt: convo.createdAt || new Date().toISOString(),
+                    plannerContext: convo.plannerContext || [], // Initialize if missing
                 }));
             }
             return [];

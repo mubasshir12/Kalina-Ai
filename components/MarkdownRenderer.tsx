@@ -82,12 +82,11 @@ const parseInline = (text: string, sources?: GroundingChunk[]): React.ReactNode 
 interface MarkdownRendererProps {
     content: string;
     sources?: GroundingChunk[];
-    onContentUpdate: (newContent: string) => void;
     isStreaming?: boolean;
     setCodeForPreview?: (data: { code: string; language: string; } | null) => void;
 }
 
-const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, sources, onContentUpdate, isStreaming, setCodeForPreview }) => {
+const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, sources, isStreaming, setCodeForPreview }) => {
     const lines = content.split('\n');
     const elements: JSX.Element[] = [];
     let currentList: { type: 'ul' | 'ol'; items: React.ReactNode[] } | null = null;

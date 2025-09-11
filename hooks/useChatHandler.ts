@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { Content, Part } from '@google/ai-sdk/ai';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Content, Part } from '@google/genai';
 import { ChatMessage as ChatMessageType, Suggestion, ChatModel, LTM, CodeSnippet, GroundingChunk, UserProfile, Tool, Conversation } from '../types';
 import { getAiClient } from '../services/aiClient';
 import { startChatSession, buildSystemInstruction } from '../services/chatService';
@@ -13,6 +13,7 @@ import { useDebug } from '../contexts/DebugContext';
 import { developerProfile } from '../services/developerProfile';
 import { getPersonaContext } from '../services/personaService';
 import { getCapabilitiesContext } from '../services/capabilitiesService';
+import { initializeSummarizer, queueSummarizationTasks } from '../services/summarizationService';
 
 const models = [
     { id: 'gemini-2.5-flash', name: 'Kalina 2.5 Flash' },
@@ -81,7 +82,15 @@ export const useChatHandler = ({
     const isCancelledRef = useRef(false);
     const responseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const responseStartTimeRef = useRef(0);
-    const { logError } = useDebug();
+    const { logError, addLog } = useDebug();
+    const summarizerInitialized = useRef(false);
+
+    useEffect(() => {
+        if (!summarizerInitialized.current) {
+            initializeSummarizer(updateConversation);
+            summarizerInitialized.current = true;
+        }
+    }, [updateConversation]);
 
 
     const clearThinkingIntervals = useCallback(() => {
@@ -163,7 +172,6 @@ export const useChatHandler = ({
 
         if (!currentConversationId) {
             const newId = crypto.randomUUID();
-            // FIX: Add the required 'createdAt' property when creating a new conversation to conform to the Conversation type.
             conversationForThisTurn = { id: newId, title: "New Chat", messages: [], createdAt: new Date().toISOString(), summaries: [] };
             setConversations(prev => [conversationForThisTurn, ...prev]);
             setActiveConversationId(newId);
@@ -206,7 +214,7 @@ export const useChatHandler = ({
         let isFileAnalysisRequest = false;
 
         try {
-            const plan = await planResponse(fullPrompt, images, file, modelToUse);
+            const plan = await planResponse(fullPrompt, images, file, modelToUse, conversationForThisTurn.plannerContext);
             if (isCancelledRef.current) return;
             
             let developerContext: string | undefined = undefined;
@@ -411,7 +419,6 @@ export const useChatHandler = ({
                     modelToUse, isThinkingEnabled, modelName, ltm, userProfile, isFirstTurnInConversation, 
                     transformMessagesToHistory(historyMessages), summaries, retrievedCodeSnippets, developerContext, personaContext, capabilitiesContext
                 );
-                // FIX: The `sendMessageStream` method expects an object with a `message` property, not a direct array of parts.
                 stream = await chat.sendMessageStream({ message: userMessageParts });
             }
             
@@ -504,6 +511,7 @@ export const useChatHandler = ({
 
             const finalCleanedResponse = finalModelResponse.replace(/^\s*TITLE:\s*[^\n]*\n?/, '');
             const finalConversationState = conversations.find(c => c.id === currentConversationId);
+            
             if (finalConversationState && !isCancelledRef.current) {
                  // New 'convo' summarization logic
                 if (finalConversationState.messages.length > 0 && finalConversationState.messages.length % 20 === 0) {
@@ -539,6 +547,23 @@ export const useChatHandler = ({
                         .then(memoryResult => {
                             const { newMemories, updatedMemories, userProfileUpdates } = memoryResult;
                             
+                            let logParts: string[] = [];
+                            if (userProfileUpdates.name) {
+                                logParts.push(`- User name updated to: **${userProfileUpdates.name}**`);
+                            }
+                            if (newMemories && newMemories.length > 0) {
+                                const facts = newMemories.map(f => `  - "${f}"`).join('\n');
+                                logParts.push(`- **New facts added:**\n${facts}`);
+                            }
+                            if (updatedMemories && updatedMemories.length > 0) {
+                                const updatesStr = updatedMemories.map(u => `  - ~"${u.old_memory}"~ -> **"${u.new_memory}"**`).join('\n');
+                                logParts.push(`- **Facts updated:**\n${updatesStr}`);
+                            }
+
+                            if (logParts.length > 0) {
+                                addLog({ level: 'log', message: `**LTM Successfully Updated**\n\n${logParts.join('\n\n')}` });
+                            }
+
                             let ltmAfterUpdates = [...ltm];
                             let memoryWasModified = false;
 
@@ -577,6 +602,27 @@ export const useChatHandler = ({
                         });
                 }
             }
+            
+            // Queue summarization for planner context. This is moved outside the conditional block
+            // that uses the stale 'conversations' state to fix a bug where the first message
+            // in a new chat was not being summarized.
+            if (!isCancelledRef.current) {
+                updateConversationMessages(currentConversationId, latestMessages => {
+                    const lastModelIndex = latestMessages.length - 1;
+                    if (lastModelIndex >= 1) { // Ensure there's a pair of messages
+                        const userMessage = latestMessages[lastModelIndex - 1];
+                        const modelMessage = latestMessages[lastModelIndex];
+                        
+                        if (userMessage.role === 'user' && modelMessage.role === 'model') {
+                            // Use the final, complete response text, not a partial one from the stream
+                            const finalModelMessageForQueue = { ...modelMessage, content: finalCleanedResponse };
+                            queueSummarizationTasks(userMessage, finalModelMessageForQueue, currentConversationId);
+                        }
+                    }
+                    return latestMessages; // Return state unchanged, just used for reading
+                });
+            }
+
         } catch (e: any) {
             if (isCancelledRef.current) return;
             logError(e);
@@ -636,17 +682,8 @@ export const useChatHandler = ({
     }, [
         apiKey, isLoading, activeConversationId, conversations, selectedChatModel, selectedTool, ltm, codeMemory, userProfile,
         setConversations, setActiveConversationId, setError, setIsLoading, updateConversationMessages, 
-        updateConversation, setCodeMemory, setLtm, setUserProfile, setActiveSuggestion, clearThinkingIntervals, stopResponseTimer, logError
+        updateConversation, setCodeMemory, setLtm, setUserProfile, setActiveSuggestion, clearThinkingIntervals, stopResponseTimer, logError, addLog
     ]);
-
-    const handleUpdateMessageContent = (messageId: string, newContent: string) => {
-        if (!activeConversationId) return;
-        updateConversationMessages(activeConversationId, prev => 
-            prev.map(msg => 
-                msg.id === messageId ? { ...msg, content: newContent } : msg
-            )
-        );
-    };
 
     return {
         isLoading,
@@ -660,7 +697,6 @@ export const useChatHandler = ({
         setIsSearchingWeb,
         clearThinkingIntervals,
         handleSendMessage,
-        handleUpdateMessageContent,
         handleCancelStream,
     };
 };

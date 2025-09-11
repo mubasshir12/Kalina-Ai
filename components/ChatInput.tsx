@@ -1,14 +1,11 @@
-
-
 import React, { useState, KeyboardEvent, useRef, ChangeEvent, useEffect } from 'react';
 import { Suggestion, Tool, ChatModel, ModelInfo } from '../types';
-import { Sparkles, ChevronDown, X, Paperclip, ArrowUp, Globe, BrainCircuit, Image, Expand, File, Presentation, FileText, Camera, Languages, Link, ClipboardPaste, ChevronUp, Mic, FlaskConical } from 'lucide-react';
-import ImageModal from './ImageModal';
+import { Sparkles, ChevronDown, X, Paperclip, ArrowUp, Globe, BrainCircuit, Image, Expand, File, Presentation, FileText, Camera, Languages, Link, ClipboardPaste, ChevronUp, Mic, FlaskConical, Pencil, Maximize2 } from 'lucide-react';
 import ModelSelector from './ModelSelector';
 import { compressImage } from '../utils/imageCompressor';
 import Tooltip from './Tooltip';
 
-// FIX: Add type definitions for the Web Speech API to resolve TypeScript errors for SpeechRecognition and SpeechRecognitionEvent.
+// Add type definitions for the Web Speech API to resolve TypeScript errors for SpeechRecognition and SpeechRecognitionEvent.
 interface SpeechRecognition {
     continuous: boolean;
     interimResults: boolean;
@@ -58,6 +55,15 @@ interface ChatInputProps {
   onNavigate: (direction: 'up' | 'down') => void;
   isAtStartOfConversation: boolean;
   isAtEndOfConversation: boolean;
+  images: { base64: string; mimeType: string; }[];
+  setImages: React.Dispatch<React.SetStateAction<{ base64: string; mimeType: string; }[]>>;
+  file: { base64: string; mimeType: string; name: string; size: number; } | null;
+  setFile: React.Dispatch<React.SetStateAction<{ base64: string; mimeType: string; name: string; size: number; } | null>>;
+  setModalImage: (url: string | null) => void;
+  onEditImage: (image: { index: number; base64: string; mimeType: string; }) => void;
+  input: string;
+  setInput: React.Dispatch<React.SetStateAction<string>>;
+  onOpenFullScreenEditor: () => void;
 }
 
 const tools: { id: Tool; name: string; description: string; icon: React.ElementType }[] = [
@@ -100,15 +106,21 @@ const ChatInput: React.FC<ChatInputProps> = ({
     onNavigate,
     isAtStartOfConversation,
     isAtEndOfConversation,
+    images,
+    setImages,
+    file,
+    setFile,
+    setModalImage,
+    onEditImage,
+    input,
+    setInput,
+    onOpenFullScreenEditor,
 }) => {
-  const [input, setInput] = useState('');
   const [urlInput, setUrlInput] = useState('');
-  const [images, setImages] = useState<{ base64: string; mimeType: string; }[]>([]);
-  const [file, setFile] = useState<{ base64: string; mimeType: string; name: string; size: number; } | null>(null);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false);
-  const [previewModalImage, setPreviewModalImage] = useState<string | null>(null);
   const [isProcessingAttachment, setIsProcessingAttachment] = useState(false);
+  const [isMaxHeight, setIsMaxHeight] = useState(false);
   
   const [isListening, setIsListening] = useState(false);
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
@@ -148,7 +160,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         };
         recognitionRef.current = recognition;
     }
-  }, []);
+  }, [setInput]);
 
   const handleToggleListening = () => {
     if (!recognitionRef.current) return;
@@ -164,6 +176,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
         textareaRef.current.style.height = 'auto'; // Reset height to recalculate
         const scrollHeight = textareaRef.current.scrollHeight;
         textareaRef.current.style.height = `${scrollHeight}px`; // Set to new scroll height
+        
+        // max-h-[8rem] is 128px. Check if scrollHeight has reached or exceeded this.
+        const maxHeight = 128;
+        setIsMaxHeight(scrollHeight >= maxHeight);
     }
   }, [input]);
 
@@ -171,7 +187,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     if (activeSuggestion) {
         setInput(activeSuggestion.prompt);
     }
-  }, [activeSuggestion]);
+  }, [activeSuggestion, setInput]);
   
     const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
         const selectedFiles = event.target.files;
@@ -245,10 +261,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
     if ((messageToSend || images.length > 0 || file || urlToSend) && !isLoading) {
       onSendMessage(messageToSend, images.length > 0 ? images : undefined, file ?? undefined, urlToSend);
-      setInput('');
       setUrlInput('');
-      setImages([]);
-      setFile(null);
     }
   };
 
@@ -335,7 +348,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     if (target.closest('button') || (attachmentMenuRef.current && attachmentMenuRef.current.contains(target))) return;
     textareaRef.current?.focus();
   };
-  
+
   // The button should be disabled for sending if attachments are processing or if there's no content.
   const isSendActionDisabled = isProcessingAttachment || (images.length === 0 && !file && !input.trim() && (selectedTool !== 'urlReader' || !urlInput.trim()));
 
@@ -356,12 +369,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <>
-      {previewModalImage && (
-          <ImageModal 
-              imageUrl={previewModalImage} 
-              onClose={() => setPreviewModalImage(null)}
-          />
-      )}
       <div className="flex flex-col gap-2">
            {/* Hidden file inputs */}
           <input ref={cameraInputRef} type="file" capture="user" accept="image/*" onChange={handleFileChange} className="hidden" />
@@ -425,7 +432,18 @@ const ChatInput: React.FC<ChatInputProps> = ({
             </div>
           )}
 
-          <div onClick={handleContainerClick} className="bg-neutral-200 dark:bg-[#202123] rounded-t-3xl rounded-b-3xl px-3 pt-4 pb-3 flex flex-col justify-between min-h-[5rem] cursor-text">
+          <div onClick={handleContainerClick} className="relative bg-neutral-200 dark:bg-[#202123] rounded-t-3xl rounded-b-3xl px-3 pt-4 pb-3 flex flex-col justify-between min-h-[5rem] cursor-text">
+            {isMaxHeight && (
+              <Tooltip content="Full Screen Editor">
+                  <button
+                      onClick={onOpenFullScreenEditor}
+                      className="absolute top-2 right-3 p-1.5 rounded-full bg-black/10 dark:bg-white/10 backdrop-blur-sm text-neutral-600 dark:text-gray-300 hover:bg-black/20 dark:hover:bg-white/20 transition-all z-10"
+                      aria-label="Open full screen editor"
+                  >
+                      <Maximize2 className="h-5 w-5" />
+                  </button>
+              </Tooltip>
+            )}
             <div className="flex-1">
                  <textarea ref={textareaRef} rows={1} value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={handleKeyPress} onPaste={handlePaste} placeholder={placeholderText()} disabled={isLoading} className="w-full bg-transparent text-neutral-800 dark:text-gray-200 placeholder:text-neutral-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-0 transition-all duration-300 disabled:opacity-50 resize-none max-h-[8rem] overflow-y-auto scrollbar-hide cursor-text" />
             </div>
@@ -462,9 +480,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
                                 <div key={index} className="relative flex-shrink-0">
                                     <div className="w-14 h-14 rounded-xl relative group bg-neutral-200 dark:bg-gray-800 ring-2 ring-amber-500">
                                         <img src={`data:${image.mimeType};base64,${image.base64}`} alt="Image preview" className="w-full h-full object-cover rounded-xl" />
-                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
-                                            <button onClick={() => setPreviewModalImage(`data:${image.mimeType};base64,${image.base64}`)} className="p-1.5 bg-white/20 text-white rounded-full backdrop-blur-sm hover:bg-white/30" aria-label="Zoom image">
-                                                <Expand className="h-5 w-5" />
+                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-1">
+                                            <button onClick={() => setModalImage(`data:${image.mimeType};base64,${image.base64}`)} className="p-1.5 bg-white/20 text-white rounded-full backdrop-blur-sm hover:bg-white/30" aria-label="Zoom image">
+                                                <Expand className="h-4 w-4" />
+                                            </button>
+                                            <button onClick={() => onEditImage({ index, ...image })} className="p-1.5 bg-white/20 text-white rounded-full backdrop-blur-sm hover:bg-white/30" aria-label="Edit image">
+                                                <Pencil className="h-4 w-4" />
                                             </button>
                                         </div>
                                     </div>

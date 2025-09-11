@@ -1,5 +1,6 @@
 
 
+
 import React from 'react';
 import { ChatMessage as ChatMessageType } from '../../types';
 import MessageContent from './MessageContent';
@@ -13,7 +14,6 @@ interface ModelMessageProps extends ChatMessageType {
     isSearchingWeb?: boolean;
     onRetry?: () => void;
     index: number;
-    onUpdateMessageContent: (messageId: string, newContent: string) => void;
     setCodeForPreview: (data: { code: string; language: string; } | null) => void;
 }
 

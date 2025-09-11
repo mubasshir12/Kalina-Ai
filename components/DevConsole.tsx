@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ConsoleLogEntry, ConsoleMode } from '../types';
-import { useDebug } from '../contexts/DebugContext';
 import { getHintForError } from '../utils/errorHints';
 import { getAiHelpForError } from '../services/debugService';
 import { X, Trash2, Copy, Check, Info, Wand2, LoaderCircle, ChevronDown } from 'lucide-react';
@@ -11,6 +10,8 @@ interface DevConsoleProps {
     isOpen: boolean;
     onClose: () => void;
     mode: ConsoleMode;
+    logs: ConsoleLogEntry[];
+    clearLogs: () => void;
 }
 
 const LogEntryItem: React.FC<{ log: ConsoleLogEntry }> = ({ log }) => {
@@ -37,18 +38,26 @@ const LogEntryItem: React.FC<{ log: ConsoleLogEntry }> = ({ log }) => {
         setIsGettingHelp(false);
     };
 
+    const messageColorClass = {
+        'error': 'text-red-600 dark:text-red-400',
+        'warn': 'text-yellow-600 dark:text-yellow-400',
+        'log': 'text-neutral-800 dark:text-gray-300'
+    }[log.level];
+
     return (
         <div className="p-3 border-b border-neutral-200 dark:border-gray-700/50">
             <div className="flex justify-between items-start gap-4">
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                     <span className="text-xs text-neutral-400 dark:text-gray-500 font-mono">{log.timestamp}</span>
-                    <p className="text-sm text-red-600 dark:text-red-400 font-semibold break-words whitespace-pre-wrap">{log.message}</p>
+                    <div className={`dev-console-log text-sm ${messageColorClass} break-words`}>
+                        <MarkdownRenderer content={log.message} />
+                    </div>
                 </div>
                 <div className="flex items-center gap-1">
                     <button onClick={handleCopy} className="p-1.5 rounded-full hover:bg-neutral-200 dark:hover:bg-gray-700 transition-colors">
                         {isCopied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4 text-neutral-500 dark:text-gray-400" />}
                     </button>
-                    {!hint && (
+                    {log.level === 'error' && !hint && (
                         <button onClick={() => setShowLangPrompt(true)} disabled={isGettingHelp} className="p-1.5 rounded-full hover:bg-neutral-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50">
                             {isGettingHelp ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4 text-amber-500 dark:text-amber-400" />}
                         </button>
@@ -104,8 +113,7 @@ const LogEntryItem: React.FC<{ log: ConsoleLogEntry }> = ({ log }) => {
                         </div>
                     ) : (
                         <div className="text-sm text-neutral-800 dark:text-gray-200 prose prose-sm dark:prose-invert max-w-none">
-                           {/* FIX: Provide the required 'onContentUpdate' prop and omit the optional 'setCodeForPreview' prop. */}
-                           <MarkdownRenderer content={aiHelp} onContentUpdate={() => {}} />
+                           <MarkdownRenderer content={aiHelp} />
                         </div>
                     )}
                 </div>
@@ -115,18 +123,35 @@ const LogEntryItem: React.FC<{ log: ConsoleLogEntry }> = ({ log }) => {
 };
 
 
-const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose }) => {
-    const { logs, clearLogs } = useDebug();
+const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose, logs, clearLogs }) => {
+    const [filter, setFilter] = useState<'all' | 'error' | 'warn'>('all');
     const consoleBodyRef = useRef<HTMLDivElement>(null);
     const sheetRef = useRef<HTMLDivElement>(null);
     const { sheetStyle, handleRef } = useDraggableSheet(sheetRef, onClose, isOpen);
 
-    useEffect(() => {
-        if (logs.length > 0) {
-            consoleBodyRef.current?.scrollTo({ top: consoleBodyRef.current.scrollHeight, behavior: 'smooth' });
-        }
-    }, [logs]);
+    const errorCount = useMemo(() => logs.filter(l => l.level === 'error').length, [logs]);
+    const warningCount = useMemo(() => logs.filter(l => l.level === 'warn').length, [logs]);
     
+    const filteredLogs = useMemo(() => {
+        if (filter === 'error') return logs.filter(l => l.level === 'error');
+        if (filter === 'warn') return logs.filter(l => l.level === 'warn');
+        return logs;
+    }, [logs, filter]);
+
+    useEffect(() => {
+        if (filteredLogs.length > 0 && consoleBodyRef.current) {
+            consoleBodyRef.current.scrollTop = consoleBodyRef.current.scrollHeight;
+        }
+    }, [filteredLogs]);
+    
+    const TABS: { id: 'all' | 'error' | 'warn'; label: string }[] = [
+        { id: 'all', label: 'All' },
+        { id: 'error', label: 'Errors' },
+        { id: 'warn', label: 'Warnings' },
+    ];
+    
+    const counts = { all: logs.length, error: errorCount, warn: warningCount };
+
     return (
         <div className={`fixed inset-0 bg-black/50 z-40 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose} aria-hidden="true">
             <div
@@ -148,13 +173,34 @@ const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose }) => {
                         </button>
                     </div>
                 </header>
+                <div className="flex-shrink-0 border-b border-neutral-200 dark:border-gray-700 px-2 sm:px-4">
+                    <div className="flex items-center gap-2 sm:gap-4 -mb-px">
+                        {TABS.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setFilter(tab.id)}
+                                className={`py-3 px-1 sm:px-2 text-sm font-semibold border-b-2 transition-colors ${
+                                    filter === tab.id
+                                        ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                                        : 'border-transparent text-neutral-500 dark:text-gray-400 hover:text-neutral-700 dark:hover:text-gray-200 hover:border-neutral-300 dark:hover:border-gray-500'
+                                }`}
+                            >
+                                {tab.label} <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
+                                    filter === tab.id
+                                        ? 'bg-amber-100 dark:bg-amber-900/40'
+                                        : 'bg-neutral-100 dark:bg-gray-700/50'
+                                }`}>{counts[tab.id]}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
                 <div ref={consoleBodyRef} className="flex-1 overflow-y-auto">
-                    {logs.length === 0 ? (
-                        <div className="flex items-center justify-center h-full text-neutral-400 dark:text-gray-500">
-                            No errors logged yet.
+                    {filteredLogs.length === 0 ? (
+                        <div className="flex items-center justify-center h-full text-neutral-400 dark:text-gray-500 p-4 text-center">
+                            {filter === 'all' ? 'No logs yet.' : `No ${filter}s logged.`}
                         </div>
                     ) : (
-                        logs.map(log => <LogEntryItem key={log.id} log={log} />)
+                        filteredLogs.map(log => <LogEntryItem key={log.id} log={log} />)
                     )}
                 </div>
             </div>

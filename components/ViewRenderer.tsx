@@ -7,6 +7,8 @@ import TranslatorView from './Translator';
 import UsageStatsView from './UsageStatsView';
 import UsageDetailView from './UsageDetailView';
 import ConvoDetailView from './ConvoDetailView';
+import FullScreenEditor from './FullScreenEditor';
+import ImageEditorView from './ImageEditorView';
 
 interface ViewRendererProps {
     currentView: View;
@@ -20,7 +22,6 @@ interface ViewRendererProps {
     translatorUsage: { input: number; output: number };
     handleRetry: () => void;
     handleEditMessage: (index: number, newContent: string) => void;
-    handleUpdateMessageContent: (messageId: string, newContent: string) => void;
     handleSelectSuggestion: (suggestion: Suggestion) => void;
     handleCancelStream: () => void;
     setCurrentView: (view: View) => void;
@@ -34,6 +35,10 @@ interface ViewRendererProps {
     onViewUsageDetails: (conversationId: string) => void;
     viewingConvo: { user: ChatMessage; model: ChatMessage; serialNumber: number } | null;
     onViewConvoDetails: (convoPair: { user: ChatMessage; model: ChatMessage; serialNumber: number }) => void;
+    onSaveEditor: (newText: string) => void;
+    editorInitialText: string;
+    onSaveEditedImage: (newBase64: string) => void;
+    imageToEdit: { index: number; base64: string; mimeType: string; } | null;
 }
 
 const ViewRenderer: React.FC<ViewRendererProps> = ({
@@ -48,7 +53,6 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
     translatorUsage,
     handleRetry,
     handleEditMessage,
-    handleUpdateMessageContent,
     handleSelectSuggestion,
     handleCancelStream,
     setCurrentView,
@@ -61,7 +65,11 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
     viewingUsageConvoId,
     onViewUsageDetails,
     viewingConvo,
-    onViewConvoDetails
+    onViewConvoDetails,
+    onSaveEditor,
+    editorInitialText,
+    onSaveEditedImage,
+    imageToEdit
 }) => {
 
     switch (currentView) {
@@ -82,6 +90,21 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
             return <UsageDetailView conversation={conversationForDetail} onBack={() => setCurrentView('usage')} onViewConvoDetails={onViewConvoDetails} />;
         case 'convo-detail':
             return <ConvoDetailView convoPair={viewingConvo} onBack={() => setCurrentView('usage-detail')} setCodeForPreview={setCodeForPreview} />;
+        case 'editor':
+            return <FullScreenEditor 
+                        onBack={() => setCurrentView('chat')} 
+                        onSave={onSaveEditor} 
+                        initialText={editorInitialText} 
+                    />;
+        case 'image-editor':
+            return imageToEdit ? (
+                <ImageEditorView
+                    onBack={() => setCurrentView('chat')}
+                    onSave={onSaveEditedImage}
+                    imageBase64={imageToEdit.base64}
+                    mimeType={imageToEdit.mimeType}
+                />
+            ) : null;
         case 'chat':
         default:
             return (
@@ -94,7 +117,7 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
                            {showWelcomeScreen ? (
                                 <WelcomeScreen onSelectSuggestion={handleSelectSuggestion} />
                             ) : (
-                                <div className="px-4 pt-4 md:px-6 md:pt-6 pb-2">
+                                <div className="px-2 pt-4 md:px-4 md:pt-6 pb-2">
                                     <div className="max-w-4xl mx-auto">
                                         {activeConversation && (
                                             <ChatHistory
@@ -104,7 +127,6 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
                                                 isSearchingWeb={isSearchingWeb}
                                                 onRetry={handleRetry}
                                                 onEditMessage={handleEditMessage}
-                                                onUpdateMessageContent={handleUpdateMessageContent}
                                                 onCancelStream={handleCancelStream}
                                                 scrollContainerRef={scrollContainerRef}
                                                 setModalImage={setModalImage}

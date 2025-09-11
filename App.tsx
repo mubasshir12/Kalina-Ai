@@ -52,14 +52,24 @@ const App: React.FC = () => {
     });
     const [isDarkMode, setIsDarkMode] = useState(() => document.documentElement.classList.contains('dark'));
     
-    // State for modals lifted from child components
+    // State for modals and attachments
+    const [images, setImages] = useState<{ base64: string; mimeType: string; }[]>([]);
+    const [file, setFile] = useState<{ base64: string; mimeType: string; name: string; size: number; } | null>(null);
     const [modalImage, setModalImage] = useState<string | null>(null);
     const [codeForPreview, setCodeForPreview] = useState<{ code: string; language: string; } | null>(null);
+    const [imageToEdit, setImageToEdit] = useState<{ index: number; base64: string; mimeType: string; } | null>(null);
+    
+    // State for chat input, lifted to manage from full-screen editor
+    const [input, setInput] = useState('');
+
 
     // Dev Console State
-    const { logs } = useDebug();
+    const { logs, clearLogs } = useDebug();
     const [isConsoleOpen, setIsConsoleOpen] = useState(false);
     const [consoleMode, setConsoleMode] = useState<ConsoleMode>('auto');
+    const [isDevConsoleVisible, setIsDevConsoleVisible] = useState(false);
+    const errorCount = logs.filter(l => l.level === 'error').length;
+    const warningCount = logs.filter(l => l.level === 'warn').length;
 
     // State for Usage Detail Views
     const [viewingUsageConvoId, setViewingUsageConvoId] = useState<string | null>(null);
@@ -91,7 +101,7 @@ const App: React.FC = () => {
     });
 
     const { activeConversation, sortedConversations, handleNewChat, handleSelectConversation } = conversationManager;
-    const { handleSendMessage, handleUpdateMessageContent, handleCancelStream, elapsedTime } = chatHandler;
+    const { handleSendMessage, handleCancelStream, elapsedTime } = chatHandler;
 
     const showWelcomeScreen = !activeConversation || activeConversation.messages.length === 0;
 
@@ -179,6 +189,17 @@ const App: React.FC = () => {
             setIsConsoleOpen(true);
         }
     }, [logs, consoleMode]);
+    
+    useEffect(() => {
+        const checkDevTools = () => {
+            const threshold = 160;
+            const isOpen = window.outerWidth - window.innerWidth > threshold || window.outerHeight - window.innerHeight > threshold;
+            setIsDevConsoleVisible(isOpen);
+        };
+        checkDevTools();
+        window.addEventListener('resize', checkDevTools);
+        return () => window.removeEventListener('resize', checkDevTools);
+    }, []);
 
     useEffect(() => {
         try {
@@ -214,6 +235,9 @@ const App: React.FC = () => {
         setActiveSuggestion(null);
         setCurrentView('chat');
         setIsHistorySheetOpen(false);
+        setImages([]);
+        setFile(null);
+        setInput('');
     }, [chatHandler]);
 
     const onNewChat = useCallback(() => {
@@ -276,6 +300,11 @@ const App: React.FC = () => {
         } else {
             executeSendMessage(prompt, images, file, url, undefined, isRetry);
         }
+        if (!isRetry) {
+            setImages([]);
+            setFile(null);
+            setInput('');
+        }
     }, [selectedChatModel, executeSendMessage]);
 
     const handleConfirmSwitch = () => {
@@ -283,6 +312,9 @@ const App: React.FC = () => {
         executeSendMessage(pendingPrompt.prompt, pendingPrompt.images, pendingPrompt.file, pendingPrompt.url, 'gemini-2.5-pro');
         setIsModelSwitchModalOpen(false);
         setPendingPrompt(null);
+        setImages([]);
+        setFile(null);
+        setInput('');
     };
 
     const handleDeclineSwitch = () => {
@@ -290,6 +322,9 @@ const App: React.FC = () => {
         executeSendMessage(pendingPrompt.prompt, pendingPrompt.images, pendingPrompt.file, pendingPrompt.url);
         setIsModelSwitchModalOpen(false);
         setPendingPrompt(null);
+        setImages([]);
+        setFile(null);
+        setInput('');
     };
 
     const handleRetry = useCallback(() => {
@@ -361,6 +396,31 @@ const App: React.FC = () => {
         setCurrentView('convo-detail');
     };
     
+    const handleStartEditImage = (image: { index: number; base64: string; mimeType: string; }) => {
+        setImageToEdit(image);
+        setCurrentView('image-editor');
+    };
+
+    const handleSaveEditedImage = (newBase64: string) => {
+        if (imageToEdit === null) return;
+        setImages(prev => {
+            const newImages = [...prev];
+            newImages[imageToEdit.index] = { base64: newBase64, mimeType: 'image/jpeg' };
+            return newImages;
+        });
+        setImageToEdit(null);
+        setCurrentView('chat');
+    };
+    
+    const handleOpenFullScreenEditor = () => {
+        setCurrentView('editor');
+    };
+
+    const handleSaveEditor = (newText: string) => {
+        setInput(newText);
+        setCurrentView('chat');
+    };
+
     const showConsoleToggleButton = consoleMode === 'manual' || (consoleMode === 'auto' && logs.length > 0);
 
     return (
@@ -392,7 +452,6 @@ const App: React.FC = () => {
                     translatorUsage={translatorUsage}
                     handleRetry={handleRetry}
                     handleEditMessage={handleEditMessage}
-                    handleUpdateMessageContent={handleUpdateMessageContent}
                     handleSelectSuggestion={handleSelectSuggestion}
                     handleCancelStream={handleCancelStream}
                     setCurrentView={setCurrentView}
@@ -409,6 +468,10 @@ const App: React.FC = () => {
                     onViewUsageDetails={handleViewUsageDetails}
                     viewingConvo={viewingConvo}
                     onViewConvoDetails={handleViewConvoDetails}
+                    onSaveEditor={handleSaveEditor}
+                    editorInitialText={input}
+                    onSaveEditedImage={handleSaveEditedImage}
+                    imageToEdit={imageToEdit}
                 />
 
                 {currentView === 'chat' && (
@@ -433,6 +496,15 @@ const App: React.FC = () => {
                                 onNavigate={handleNavigate}
                                 isAtStartOfConversation={isAtStart}
                                 isAtEndOfConversation={isAtEnd}
+                                images={images}
+                                setImages={setImages}
+                                file={file}
+                                setFile={setFile}
+                                setModalImage={setModalImage}
+                                onEditImage={handleStartEditImage}
+                                input={input}
+                                setInput={setInput}
+                                onOpenFullScreenEditor={handleOpenFullScreenEditor}
                             />
                         </div>
                     </div>
@@ -440,16 +512,19 @@ const App: React.FC = () => {
                 
                 {IS_DEV_CONSOLE_ENABLED && (
                     <>
-                        {showConsoleToggleButton && (
+                        {showConsoleToggleButton && !isConsoleOpen && !isDevConsoleVisible && (
                             <ConsoleToggleButton
                                 onClick={() => setIsConsoleOpen(prev => !prev)}
-                                errorCount={logs.length}
+                                errorCount={errorCount}
+                                warningCount={warningCount}
                             />
                         )}
                         <DevConsole
                             isOpen={isConsoleOpen}
                             onClose={() => setIsConsoleOpen(false)}
                             mode={consoleMode}
+                            logs={logs}
+                            clearLogs={clearLogs}
                         />
                     </>
                 )}
