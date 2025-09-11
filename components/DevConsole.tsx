@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ConsoleLogEntry, ConsoleMode } from '../types';
 import { getHintForError } from '../utils/errorHints';
 import { getAiHelpForError } from '../services/debugService';
-import { X, Trash2, Copy, Check, Info, Wand2, LoaderCircle, ChevronDown } from 'lucide-react';
+import { generateImage } from '../services/imageService';
+import { X, Trash2, Copy, Check, Info, Wand2, LoaderCircle, ChevronDown, Image as ImageIcon } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useDraggableSheet } from '../hooks/useDraggableSheet';
 
@@ -124,19 +125,26 @@ const LogEntryItem: React.FC<{ log: ConsoleLogEntry }> = ({ log }) => {
 
 
 const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose, logs, clearLogs }) => {
-    const [filter, setFilter] = useState<'all' | 'error' | 'warn'>('all');
+    const [activeTab, setActiveTab] = useState<'all' | 'error' | 'warn' | 'imageGen'>('all');
     const consoleBodyRef = useRef<HTMLDivElement>(null);
     const sheetRef = useRef<HTMLDivElement>(null);
     const { sheetStyle, handleRef } = useDraggableSheet(sheetRef, onClose, isOpen);
+
+    // Image Generation State
+    const [imagePrompt, setImagePrompt] = useState<string>('A photorealistic image of a cat wearing a tiny wizard hat, detailed, 4k');
+    const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
+    const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+    const [imageError, setImageError] = useState<string | null>(null);
+    const [imageModelId, setImageModelId] = useState<string>('imagen-4.0-generate-001');
 
     const errorCount = useMemo(() => logs.filter(l => l.level === 'error').length, [logs]);
     const warningCount = useMemo(() => logs.filter(l => l.level === 'warn').length, [logs]);
     
     const filteredLogs = useMemo(() => {
-        if (filter === 'error') return logs.filter(l => l.level === 'error');
-        if (filter === 'warn') return logs.filter(l => l.level === 'warn');
+        if (activeTab === 'error') return logs.filter(l => l.level === 'error');
+        if (activeTab === 'warn') return logs.filter(l => l.level === 'warn');
         return logs;
-    }, [logs, filter]);
+    }, [logs, activeTab]);
 
     useEffect(() => {
         if (filteredLogs.length > 0 && consoleBodyRef.current) {
@@ -144,10 +152,29 @@ const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose, logs, clearLog
         }
     }, [filteredLogs]);
     
-    const TABS: { id: 'all' | 'error' | 'warn'; label: string }[] = [
+    const handleGenerateImage = async () => {
+        if (!imagePrompt.trim()) {
+            setImageError("Prompt cannot be empty.");
+            return;
+        }
+        setIsGeneratingImage(true);
+        setGeneratedImage(null);
+        setImageError(null);
+        try {
+            const imageB64 = await generateImage(imagePrompt, imageModelId);
+            setGeneratedImage(imageB64);
+        } catch (e: any) {
+            setImageError(e.message || "An unknown error occurred during image generation.");
+        } finally {
+            setIsGeneratingImage(false);
+        }
+    };
+
+    const TABS: { id: 'all' | 'error' | 'warn' | 'imageGen'; label: string }[] = [
         { id: 'all', label: 'All' },
         { id: 'error', label: 'Errors' },
         { id: 'warn', label: 'Warnings' },
+        { id: 'imageGen', label: 'Image Gen' },
     ];
     
     const counts = { all: logs.length, error: errorCount, warn: warningCount };
@@ -178,29 +205,96 @@ const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose, logs, clearLog
                         {TABS.map(tab => (
                             <button
                                 key={tab.id}
-                                onClick={() => setFilter(tab.id)}
+                                onClick={() => setActiveTab(tab.id)}
                                 className={`py-3 px-1 sm:px-2 text-sm font-semibold border-b-2 transition-colors ${
-                                    filter === tab.id
+                                    activeTab === tab.id
                                         ? 'border-amber-500 text-amber-600 dark:text-amber-400'
                                         : 'border-transparent text-neutral-500 dark:text-gray-400 hover:text-neutral-700 dark:hover:text-gray-200 hover:border-neutral-300 dark:hover:border-gray-500'
                                 }`}
                             >
-                                {tab.label} <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
-                                    filter === tab.id
-                                        ? 'bg-amber-100 dark:bg-amber-900/40'
-                                        : 'bg-neutral-100 dark:bg-gray-700/50'
-                                }`}>{counts[tab.id]}</span>
+                                {tab.label}
+                                {(tab.id === 'all' || tab.id === 'error' || tab.id === 'warn') && (
+                                    <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
+                                        activeTab === tab.id
+                                            ? 'bg-amber-100 dark:bg-amber-900/40'
+                                            : 'bg-neutral-100 dark:bg-gray-700/50'
+                                    }`}>{counts[tab.id]}</span>
+                                )}
                             </button>
                         ))}
                     </div>
                 </div>
                 <div ref={consoleBodyRef} className="flex-1 overflow-y-auto">
-                    {filteredLogs.length === 0 ? (
-                        <div className="flex items-center justify-center h-full text-neutral-400 dark:text-gray-500 p-4 text-center">
-                            {filter === 'all' ? 'No logs yet.' : `No ${filter}s logged.`}
-                        </div>
+                    {(activeTab === 'all' || activeTab === 'error' || activeTab === 'warn') ? (
+                        <>
+                            {filteredLogs.length === 0 ? (
+                                <div className="flex items-center justify-center h-full text-neutral-400 dark:text-gray-500 p-4 text-center">
+                                    {activeTab === 'all' ? 'No logs yet.' : `No ${activeTab}s logged.`}
+                                </div>
+                            ) : (
+                                filteredLogs.map(log => <LogEntryItem key={log.id} log={log} />)
+                            )}
+                        </>
                     ) : (
-                        filteredLogs.map(log => <LogEntryItem key={log.id} log={log} />)
+                        <div className="p-4 space-y-4">
+                            <h3 className="text-base font-semibold text-neutral-700 dark:text-gray-300">Image Generation (Test Panel)</h3>
+                             <div>
+                                <label htmlFor="image-model-id" className="text-sm font-medium text-neutral-600 dark:text-gray-400">Model ID</label>
+                                <input
+                                    id="image-model-id"
+                                    type="text"
+                                    value={imageModelId}
+                                    onChange={(e) => setImageModelId(e.target.value)}
+                                    disabled={isGeneratingImage}
+                                    className="mt-1 w-full p-2 bg-neutral-100 dark:bg-gray-800/60 border border-neutral-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-500 text-sm"
+                                    placeholder="e.g., imagen-4.0-generate-001"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="image-prompt" className="text-sm font-medium text-neutral-600 dark:text-gray-400">Prompt</label>
+                                <textarea
+                                    id="image-prompt"
+                                    rows={3}
+                                    value={imagePrompt}
+                                    onChange={(e) => setImagePrompt(e.target.value)}
+                                    disabled={isGeneratingImage}
+                                    className="mt-1 w-full p-2 bg-neutral-100 dark:bg-gray-800/60 border border-neutral-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-500 text-sm"
+                                    placeholder="Describe the image you want to create..."
+                                />
+                            </div>
+                            <button
+                                onClick={handleGenerateImage}
+                                disabled={isGeneratingImage}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-amber-600 text-white font-semibold rounded-lg hover:bg-amber-700 transition-colors disabled:bg-amber-400 dark:disabled:bg-amber-800 disabled:cursor-not-allowed"
+                            >
+                                {isGeneratingImage ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+                                {isGeneratingImage ? 'Generating...' : 'Generate Image'}
+                            </button>
+
+                            {imageError && (
+                                <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800/50 rounded-md text-red-700 dark:text-red-300 text-sm">
+                                    {imageError}
+                                </div>
+                            )}
+                            
+                            <div className="mt-4">
+                                {isGeneratingImage && (
+                                     <div className="w-full aspect-square bg-neutral-100 dark:bg-gray-800 rounded-lg flex items-center justify-center animate-pulse">
+                                        <span className="text-neutral-500 dark:text-gray-400">Generating...</span>
+                                    </div>
+                                )}
+                                {generatedImage && (
+                                    <div>
+                                        <h4 className="text-sm font-medium text-neutral-600 dark:text-gray-400 mb-2">Result:</h4>
+                                        <img
+                                            src={`data:image/png;base64,${generatedImage}`}
+                                            alt="Generated by AI"
+                                            className="w-full rounded-lg border border-neutral-200 dark:border-gray-700"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>
