@@ -1,11 +1,15 @@
-
 import { Content, Type } from "@google/genai";
 import { getAiClient } from "./aiClient";
+
+interface TokenUsage {
+    input: number;
+    output: number;
+}
 
 export const processAndSaveCode = async (
     codeBlock: { language: string; code: string; },
     context: Content[]
-): Promise<{ description: string }> => {
+): Promise<{ description: string, usage: TokenUsage }> => {
     const ai = getAiClient();
     const systemInstruction = `Analyze the code block and conversation context. Create a one-sentence description of the code's function for future retrieval. Respond ONLY with this JSON: { "description": "Your one-sentence description." }`;
     
@@ -29,17 +33,25 @@ export const processAndSaveCode = async (
             }
         });
         const jsonText = response.text.trim();
-        return JSON.parse(jsonText);
+        const result = JSON.parse(jsonText);
+        const usage = {
+            input: response.usageMetadata?.promptTokenCount || 0,
+            output: response.usageMetadata?.candidatesTokenCount || 0,
+        };
+        return { description: result.description, usage };
     } catch (error) {
         console.error("Error processing code:", error);
-        return { description: `A ${codeBlock.language} code snippet.` };
+        return { 
+            description: `A ${codeBlock.language} code snippet.`,
+            usage: { input: 0, output: 0 }
+        };
     }
 };
 
 export const findRelevantCode = async (
     prompt: string,
     codeSnippets: { id: string; description: string }[]
-): Promise<string[]> => {
+): Promise<{ relevantIds: string[], usage: TokenUsage }> => {
     const ai = getAiClient();
     const systemInstruction = `Find relevant code. Based on the user prompt, identify the most relevant code snippet IDs. Respond ONLY with this JSON: { "relevant_ids": ["id1", "id2", ...] }`;
     
@@ -67,9 +79,13 @@ export const findRelevantCode = async (
         });
         const jsonText = response.text.trim();
         const result = JSON.parse(jsonText);
-        return result.relevant_ids || [];
+        const usage = {
+            input: response.usageMetadata?.promptTokenCount || 0,
+            output: response.usageMetadata?.candidatesTokenCount || 0,
+        };
+        return { relevantIds: result.relevant_ids || [], usage };
     } catch (error) {
         console.error("Error finding relevant code:", error);
-        return [];
+        return { relevantIds: [], usage: { input: 0, output: 0 } };
     }
 };

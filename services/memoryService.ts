@@ -41,13 +41,20 @@ export interface MemoryUpdate {
     new_memory: string;
 }
 
-export interface MemoryUpdateResult {
+export interface MemoryUpdatePayload {
     newMemories: string[];
     updatedMemories: MemoryUpdate[];
     userProfileUpdates: Partial<UserProfile>;
     suggestions: string[];
 }
 
+export interface MemoryUpdateResult {
+    payload: MemoryUpdatePayload;
+    usage: {
+        input: number;
+        output: number;
+    }
+}
 
 export const updateMemory = async (
     lastMessages: Content[],
@@ -74,6 +81,11 @@ NEW CONVERSATION TURNS:
 ${historyString}
 
 Analyze the conversation and LTM, then generate the JSON output as instructed.`;
+    
+    const fallbackResult: MemoryUpdateResult = {
+        payload: { newMemories: [], updatedMemories: [], userProfileUpdates: {}, suggestions: [] },
+        usage: { input: 0, output: 0 }
+    };
 
     try {
         const response = await ai.models.generateContent({
@@ -117,22 +129,39 @@ Analyze the conversation and LTM, then generate the JSON output as instructed.`;
         });
         const jsonText = response.text.trim();
         const parsed = JSON.parse(jsonText);
-        return {
+        
+        const payload: MemoryUpdatePayload = {
             newMemories: parsed.new_memories || [],
             updatedMemories: parsed.updated_memories || [],
             userProfileUpdates: parsed.user_profile_updates || {},
             suggestions: parsed.suggestions || [],
         };
+
+        const usage = {
+            input: response.usageMetadata?.promptTokenCount || 0,
+            output: response.usageMetadata?.candidatesTokenCount || 0,
+        };
+        
+        return { payload, usage };
+
     } catch (error) {
         appLogger.error("Memory update API request failed", error);
-        return { newMemories: [], updatedMemories: [], userProfileUpdates: {}, suggestions: [] };
+        return fallbackResult;
     }
 };
+
+export interface ConvoSummaryResult {
+    summaries: ConvoSummary[];
+    usage: {
+        input: number;
+        output: number;
+    }
+}
 
 export const generateConvoSummaries = async (
     convos: { user: ChatMessage, model: ChatMessage }[],
     startingSerialNumber: number
-): Promise<ConvoSummary[]> => {
+): Promise<ConvoSummaryResult> => {
     const ai = getAiClient();
     const systemInstruction = `You are a conversation summarizer. For each user/AI convo pair provided, create a concise 4-5 line summary of the AI's response. Extract the user's original input text.
 Respond ONLY with a valid JSON array matching the schema.`;
@@ -146,6 +175,8 @@ AI Response: "${convo.model.content}"
     ).join('\n');
     
     const prompt = `Generate summaries for the following conversation pairs:\n${convoText}`;
+    
+    const fallbackResult: ConvoSummaryResult = { summaries: [], usage: { input: 0, output: 0 }};
 
     try {
         const response = await ai.models.generateContent({
@@ -171,7 +202,7 @@ AI Response: "${convo.model.content}"
         const jsonText = response.text.trim();
         const summariesData: { convo_index: number; user_input: string; summary: string; }[] = JSON.parse(jsonText);
 
-        return summariesData.map((data): ConvoSummary | null => {
+        const summaries = summariesData.map((data): ConvoSummary | null => {
             const originalConvo = convos[data.convo_index];
             if (!originalConvo) return null;
 
@@ -184,9 +215,16 @@ AI Response: "${convo.model.content}"
                 summary: data.summary,
             };
         }).filter((s): s is ConvoSummary => s !== null);
+        
+        const usage = {
+            input: response.usageMetadata?.promptTokenCount || 0,
+            output: response.usageMetadata?.candidatesTokenCount || 0,
+        };
+        
+        return { summaries, usage };
 
     } catch (error) {
         console.error("Error generating convo summaries:", error);
-        return [];
+        return fallbackResult;
     }
 };

@@ -68,7 +68,7 @@ const App: React.FC = () => {
 
 
     // Dev Console State
-    const { logs, clearLogs } = useDebug();
+    const { logs, addTokenLog, clearLogs } = useDebug();
     const [isConsoleOpen, setIsConsoleOpen] = useState(false);
     const [consoleMode, setConsoleMode] = useState<ConsoleMode>('auto');
     const [isDevConsoleVisible, setIsDevConsoleVisible] = useState(false);
@@ -402,7 +402,12 @@ const App: React.FC = () => {
             input: prev.input + tokens.input,
             output: prev.output + tokens.output,
         }));
-    }, []);
+        addTokenLog({
+            source: 'Translator',
+            inputTokens: tokens.input,
+            outputTokens: tokens.output,
+        });
+    }, [addTokenLog]);
     
     const handleViewUsageDetails = (conversationId: string) => {
         setViewingUsageConvoId(conversationId);

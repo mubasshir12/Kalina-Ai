@@ -83,15 +83,15 @@ export const useChatHandler = ({
     const isCancelledRef = useRef(false);
     const responseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const responseStartTimeRef = useRef(0);
-    const { logError, addLog } = useDebug();
+    const { logError, addLog, addTokenLog } = useDebug();
     const summarizerInitialized = useRef(false);
 
     useEffect(() => {
         if (!summarizerInitialized.current) {
-            initializeSummarizer(updateConversation);
+            initializeSummarizer(updateConversation, addTokenLog);
             summarizerInitialized.current = true;
         }
-    }, [updateConversation]);
+    }, [updateConversation, addTokenLog]);
 
 
     const clearThinkingIntervals = useCallback(() => {
@@ -215,7 +215,8 @@ export const useChatHandler = ({
         let isFileAnalysisRequest = false;
 
         try {
-            const plan = await planResponse(fullPrompt, images, file, modelToUse, conversationForThisTurn.plannerContext);
+            const { plan, usage: plannerUsage } = await planResponse(fullPrompt, images, file, modelToUse, conversationForThisTurn.plannerContext);
+            addTokenLog({ source: 'Planner', inputTokens: plannerUsage.input, outputTokens: plannerUsage.output, details: modelToUse });
             if (isCancelledRef.current) return;
             
             let developerContext: string | undefined = undefined;
@@ -385,7 +386,8 @@ export const useChatHandler = ({
             let retrievedCodeSnippets: CodeSnippet[] = [];
             if (plan.needsCodeContext && codeMemory.length > 0) {
                 const codeDescriptions = codeMemory.map(({ id, description }) => ({ id, description }));
-                const relevantIds = await findRelevantCode(fullPrompt, codeDescriptions);
+                const { relevantIds, usage: findCodeUsage } = await findRelevantCode(fullPrompt, codeDescriptions);
+                addTokenLog({ source: 'Code Analyzer', inputTokens: findCodeUsage.input, outputTokens: findCodeUsage.output, details: 'Find Relevant' });
                  if (isCancelledRef.current) return;
                 retrievedCodeSnippets = codeMemory.filter(snippet => relevantIds.includes(snippet.id));
             }
@@ -486,18 +488,21 @@ export const useChatHandler = ({
             }
 
             if (usageMetadata && !isCancelledRef.current) {
+                const inputTokens = usageMetadata.promptTokenCount || 0;
+                const outputTokens = usageMetadata.candidatesTokenCount || 0;
+                
+                addTokenLog({ source: 'Chat', inputTokens, outputTokens, details: modelToUse });
+
                 updateConversationMessages(currentConversationId, prev => {
                     const lastMessage = prev[prev.length - 1];
                     if (lastMessage?.role === 'model') {
-                        const totalPromptTokens = usageMetadata.promptTokenCount || 0;
-                        const outputTokens = usageMetadata.candidatesTokenCount;
                         const userTextTokens = estimateTokens(fullPrompt);
 
                         // If a tool that adds significant content to the prompt was used (image, url, search), show the total prompt tokens to reflect the tool's cost.
                         // Otherwise (for normal chat or creator requests), only show the user's text tokens to hide history/system prompt cost.
                         const toolUsed = toolInUse || isImageAnalysisRequest || isFileAnalysisRequest || isWebSearchEnabled;
-                        const displayInputTokens = toolUsed ? totalPromptTokens : userTextTokens;
-                        const systemTokens = toolUsed ? 0 : totalPromptTokens - userTextTokens;
+                        const displayInputTokens = toolUsed ? inputTokens : userTextTokens;
+                        const systemTokens = toolUsed ? 0 : inputTokens - userTextTokens;
 
                         return [...prev.slice(0, -1), { 
                             ...lastMessage, 
@@ -525,7 +530,10 @@ export const useChatHandler = ({
                     }
                     if (convosToSummarize.length > 0) {
                         generateConvoSummaries(convosToSummarize, finalConversationState.summaries?.length || 0)
-                            .then(newSummaries => {
+                            .then(({ summaries: newSummaries, usage: summaryUsage }) => {
+                                if (addTokenLog) {
+                                    addTokenLog({ source: 'Convo Summarizer', inputTokens: summaryUsage.input, outputTokens: summaryUsage.output });
+                                }
                                 updateConversation(currentConversationId, c => ({
                                     ...c,
                                     summaries: [...(c.summaries || []), ...newSummaries]
@@ -540,13 +548,19 @@ export const useChatHandler = ({
                 while ((match = codeBlockRegex.exec(finalCleanedResponse)) !== null) {
                     const capturedMatch = match;
                     processAndSaveCode({ language: capturedMatch[1] || 'text', code: capturedMatch[2] }, codeContextForSaving)
-                        .then(result => setCodeMemory(prev => [...prev, { id: crypto.randomUUID(), ...result, language: capturedMatch[1] || 'text', code: capturedMatch[2] }]));
+                        .then(({ description, usage: codeSaveUsage }) => {
+                            addTokenLog({ source: 'Code Analyzer', inputTokens: codeSaveUsage.input, outputTokens: codeSaveUsage.output, details: 'Process & Save' });
+                            setCodeMemory(prev => [...prev, { id: crypto.randomUUID(), description, language: capturedMatch[1] || 'text', code: capturedMatch[2] }])
+                        });
                 }
 
                 if (finalCleanedResponse.trim()) {
                     updateMemory([{ role: 'user', parts: [{ text: fullPrompt }] }, { role: 'model', parts: [{ text: finalCleanedResponse }] }], ltm, userProfile, modelToUse)
                         .then(memoryResult => {
-                            const { newMemories, updatedMemories, userProfileUpdates, suggestions } = memoryResult;
+                            const { payload, usage: memoryUsage } = memoryResult;
+                            addTokenLog({ source: 'Memory/Suggestions', inputTokens: memoryUsage.input, outputTokens: memoryUsage.output, details: modelToUse });
+
+                            const { newMemories, updatedMemories, userProfileUpdates, suggestions } = payload;
                             
                             let logParts: string[] = [];
                             if (userProfileUpdates.name) {
@@ -689,7 +703,7 @@ export const useChatHandler = ({
         apiKey, isLoading, activeConversationId, conversations, selectedChatModel, selectedTool, ltm, codeMemory, userProfile,
         setConversations, setActiveConversationId, setError, setIsLoading, updateConversationMessages, 
         updateConversation, setCodeMemory, setLtm, setUserProfile, setActiveSuggestion, setSuggestions,
-        clearThinkingIntervals, stopResponseTimer, logError, addLog
+        clearThinkingIntervals, stopResponseTimer, logError, addLog, addTokenLog
     ]);
 
     return {

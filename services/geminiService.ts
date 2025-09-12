@@ -68,7 +68,15 @@ export interface ResponsePlan {
     searchPlan?: ThoughtStep[];
 }
 
-export const planResponse = async (prompt: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; }, model: string = 'gemini-2.5-flash', plannerContext?: PlannerContextItem[]): Promise<ResponsePlan> => {
+export interface PlanResponseResult {
+    plan: ResponsePlan;
+    usage: {
+        input: number;
+        output: number;
+    };
+}
+
+export const planResponse = async (prompt: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; }, model: string = 'gemini-2.5-flash', plannerContext?: PlannerContextItem[]): Promise<PlanResponseResult> => {
     const ai = getAiClient();
     try {
         let fullPrompt = prompt;
@@ -144,13 +152,19 @@ export const planResponse = async (prompt: string, images?: { base64: string; mi
             result.thoughts = [];
         }
 
-        return { ...result, thoughts: result.thoughts || [], searchPlan: result.searchPlan || [] };
+        const plan: ResponsePlan = { ...result, thoughts: result.thoughts || [], searchPlan: result.searchPlan || [] };
+        const usage = {
+            input: response.usageMetadata?.promptTokenCount || 0,
+            output: response.usageMetadata?.candidatesTokenCount || 0,
+        };
+
+        return { plan, usage };
     } catch (error)
     {
         console.error("Error planning response:", error);
         // Fallback: If planning fails, assume web search is needed but disable thinking.
         const needsWebSearch = true;
-        return { 
+        const fallbackPlan: ResponsePlan = { 
             needsWebSearch: needsWebSearch,
             isUrlReadRequest: false,
             isCreatorRequest: false,
@@ -161,5 +175,6 @@ export const planResponse = async (prompt: string, images?: { base64: string; mi
             thoughts: [], // No thoughts when thinking is disabled
             searchPlan: []
         };
+        return { plan: fallbackPlan, usage: { input: 0, output: 0 } };
     }
 };

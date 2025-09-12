@@ -156,3 +156,13 @@ export interface ConsoleLogEntry {
     message: string;
     stack?: string;
 }
+
+export interface TokenLog {
+    id: string;
+    timestamp: string;
+    source: 'Chat' | 'Memory/Suggestions' | 'Translator' | 'Planner' | 'Code Analyzer' | 'Convo Summarizer';
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    details?: string;
+}

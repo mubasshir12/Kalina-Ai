@@ -1,18 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { ConsoleLogEntry, ConsoleMode } from '../types';
+import { ConsoleLogEntry, ConsoleMode, TokenLog } from '../types';
 import { getHintForError } from '../utils/errorHints';
 import { getAiHelpForError } from '../services/debugService';
 import { X, Trash2, Copy, Check, Info, Wand2, LoaderCircle, ChevronDown } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useDraggableSheet } from '../hooks/useDraggableSheet';
+import { useDebug } from '../contexts/DebugContext';
 
-interface DevConsoleProps {
-    isOpen: boolean;
-    onClose: () => void;
-    mode: ConsoleMode;
-    logs: ConsoleLogEntry[];
-    clearLogs: () => void;
-}
+// ... (LogEntryItem component remains the same)
 
 const LogEntryItem: React.FC<{ log: ConsoleLogEntry }> = ({ log }) => {
     const [isCopied, setIsCopied] = useState(false);
@@ -122,9 +117,60 @@ const LogEntryItem: React.FC<{ log: ConsoleLogEntry }> = ({ log }) => {
     );
 };
 
+const TokenLogPanel: React.FC<{ logs: TokenLog[] }> = ({ logs }) => {
+    const totalTokens = useMemo(() => logs.reduce((acc, log) => acc + log.totalTokens, 0), [logs]);
 
-const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose, logs, clearLogs }) => {
-    const [filter, setFilter] = useState<'all' | 'error' | 'warn'>('all');
+    if (logs.length === 0) {
+        return (
+            <div className="flex items-center justify-center h-full text-neutral-400 dark:text-gray-500 p-4 text-center">
+                No token usage logged yet.
+            </div>
+        );
+    }
+
+    return (
+        <div className="text-sm font-mono">
+            <div className="p-3 sticky top-0 bg-white/80 dark:bg-[#1e1f22]/80 backdrop-blur-sm border-b border-neutral-200 dark:border-gray-700">
+                <p className="font-bold text-neutral-800 dark:text-gray-200">Total Logged Tokens: {totalTokens.toLocaleString()}</p>
+            </div>
+            <table className="w-full text-left">
+                <thead className="text-xs text-neutral-500 dark:text-gray-400 uppercase bg-neutral-50 dark:bg-gray-800/50">
+                    <tr>
+                        <th className="px-3 py-2">Timestamp</th>
+                        <th className="px-3 py-2">Source</th>
+                        <th className="px-3 py-2 text-right">Input</th>
+                        <th className="px-3 py-2 text-right">Output</th>
+                        <th className="px-3 py-2 text-right">Total</th>
+                    </tr>
+                </thead>
+                <tbody className="text-xs text-neutral-700 dark:text-gray-300">
+                    {logs.map(log => (
+                        <tr key={log.id} className="border-b border-neutral-100 dark:border-gray-700/50 hover:bg-neutral-50 dark:hover:bg-gray-800/30">
+                            <td className="px-3 py-2 text-neutral-400 dark:text-gray-500">{log.timestamp}</td>
+                            <td className="px-3 py-2 font-semibold">{log.source}</td>
+                            <td className="px-3 py-2 text-right">{log.inputTokens.toLocaleString()}</td>
+                            <td className="px-3 py-2 text-right">{log.outputTokens.toLocaleString()}</td>
+                            <td className="px-3 py-2 text-right font-bold">{log.totalTokens.toLocaleString()}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+};
+
+
+interface DevConsoleProps {
+    isOpen: boolean;
+    onClose: () => void;
+    mode: ConsoleMode;
+    logs: ConsoleLogEntry[];
+    clearLogs: () => void;
+}
+
+const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose, mode, logs, clearLogs }) => {
+    const { tokenLogs } = useDebug();
+    const [filter, setFilter] = useState<'all' | 'error' | 'warn' | 'tokens'>('all');
     const consoleBodyRef = useRef<HTMLDivElement>(null);
     const sheetRef = useRef<HTMLDivElement>(null);
     const { sheetStyle, handleRef } = useDraggableSheet(sheetRef, onClose, isOpen);
@@ -139,18 +185,26 @@ const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose, logs, clearLog
     }, [logs, filter]);
 
     useEffect(() => {
-        if (filteredLogs.length > 0 && consoleBodyRef.current) {
+        if (consoleBodyRef.current) {
             consoleBodyRef.current.scrollTop = consoleBodyRef.current.scrollHeight;
         }
-    }, [filteredLogs]);
+    }, [filteredLogs, tokenLogs]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            // Reset to 'all' tab when closed
+            setFilter('all');
+        }
+    }, [isOpen]);
     
-    const TABS: { id: 'all' | 'error' | 'warn'; label: string }[] = [
+    const TABS: { id: 'all' | 'error' | 'warn' | 'tokens'; label: string }[] = [
         { id: 'all', label: 'All' },
+        { id: 'tokens', label: 'Tokens' },
         { id: 'error', label: 'Errors' },
         { id: 'warn', label: 'Warnings' },
     ];
     
-    const counts = { all: logs.length, error: errorCount, warn: warningCount };
+    const counts = { all: logs.length, error: errorCount, warn: warningCount, tokens: tokenLogs.length };
 
     return (
         <div className={`fixed inset-0 bg-black/50 z-40 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose} aria-hidden="true">
@@ -195,7 +249,9 @@ const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose, logs, clearLog
                     </div>
                 </div>
                 <div ref={consoleBodyRef} className="flex-1 overflow-y-auto">
-                    {filteredLogs.length === 0 ? (
+                   {filter === 'tokens' ? (
+                       <TokenLogPanel logs={tokenLogs} />
+                   ) : filteredLogs.length === 0 ? (
                         <div className="flex items-center justify-center h-full text-neutral-400 dark:text-gray-500 p-4 text-center">
                             {filter === 'all' ? 'No logs yet.' : `No ${filter}s logged.`}
                         </div>
