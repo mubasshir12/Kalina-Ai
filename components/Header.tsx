@@ -33,19 +33,6 @@ const Header: React.FC<HeaderProps> = (props) => {
           <div className="flex items-center gap-2">
               {props.isChatView && (
                   <>
-                    {props.hasActiveConversation && (
-                        <button
-                            onClick={props.onToggleSelectionMode}
-                            className={`flex items-center justify-center h-10 px-4 text-sm font-semibold rounded-full transition-colors ${
-                                props.isSelectionMode
-                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60'
-                                    : 'text-neutral-600 dark:text-gray-300 hover:bg-neutral-200 dark:hover:bg-gray-800/60'
-                            }`}
-                            aria-label={props.isSelectionMode ? "Cancel selection mode" : "Select messages"}
-                        >
-                            {props.isSelectionMode ? 'Cancel' : 'Select'}
-                        </button>
-                    )}
                     <ThemeSelector />
                      <button
                         onClick={props.onOpenHistory}
@@ -81,6 +68,10 @@ const Header: React.FC<HeaderProps> = (props) => {
         onShowUsage={props.onShowUsage}
         consoleMode={props.consoleMode}
         setConsoleMode={props.setConsoleMode}
+        isChatView={props.isChatView}
+        hasActiveConversation={props.hasActiveConversation}
+        isSelectionMode={props.isSelectionMode}
+        onToggleSelectionMode={props.onToggleSelectionMode}
       />
     </>
   );

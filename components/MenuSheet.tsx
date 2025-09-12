@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { BrainCircuit, BarChart3, Terminal } from 'lucide-react';
+import { BrainCircuit, BarChart3, Terminal, ListChecks } from 'lucide-react';
 import { ConsoleMode } from '../types';
 import { IS_DEV_CONSOLE_ENABLED } from '../config';
 import { useDraggableSheet } from '../hooks/useDraggableSheet';
@@ -11,6 +11,10 @@ interface MenuSheetProps {
     onShowUsage: () => void;
     consoleMode: ConsoleMode;
     setConsoleMode: (mode: ConsoleMode) => void;
+    isChatView: boolean;
+    hasActiveConversation: boolean;
+    isSelectionMode: boolean;
+    onToggleSelectionMode: () => void;
 }
 
 const MenuSheet: React.FC<MenuSheetProps> = ({
@@ -19,7 +23,11 @@ const MenuSheet: React.FC<MenuSheetProps> = ({
     onShowMemory,
     onShowUsage,
     consoleMode,
-    setConsoleMode
+    setConsoleMode,
+    isChatView,
+    hasActiveConversation,
+    isSelectionMode,
+    onToggleSelectionMode
 }) => {
     const sheetRef = useRef<HTMLDivElement>(null);
     const { sheetStyle, handleRef } = useDraggableSheet(sheetRef, onClose, isOpen);
@@ -56,6 +64,14 @@ const MenuSheet: React.FC<MenuSheetProps> = ({
                             <BrainCircuit className="h-6 w-6 text-neutral-500 dark:text-gray-400" />
                             <span>Memory Management</span>
                         </button>
+
+                        {isChatView && hasActiveConversation && (
+                            <button onClick={() => handleLinkClick(onToggleSelectionMode)} className="w-full flex items-center gap-4 p-3 text-left text-base font-medium text-neutral-700 dark:text-gray-300 rounded-lg hover:bg-neutral-100 dark:hover:bg-gray-800/60 transition-colors">
+                                <ListChecks className="h-6 w-6 text-neutral-500 dark:text-gray-400" />
+                                <span>{isSelectionMode ? 'Cancel Selection' : 'Select Messages'}</span>
+                            </button>
+                        )}
+
                         {IS_DEV_CONSOLE_ENABLED && (
                             <>
                                 <div className="border-t border-neutral-200 dark:border-gray-600 my-2" />
