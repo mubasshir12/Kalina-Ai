@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage as ChatMessageType } from '../../types';
 import { X, Copy, Check, Pencil, File, FileText, Presentation, Link } from 'lucide-react';
@@ -63,6 +62,7 @@ interface UserMessageProps extends ChatMessageType {
     onEditMessage?: (index: number, newContent: string) => void;
     setModalImage: (url: string | null) => void;
     index: number;
+    isSelectionMode?: boolean;
 }
 
 const UserMessage: React.FC<UserMessageProps> = ({ 
@@ -75,7 +75,8 @@ const UserMessage: React.FC<UserMessageProps> = ({
     isAnalyzingFile,
     index, 
     onEditMessage,
-    setModalImage
+    setModalImage,
+    isSelectionMode
 }) => {
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isMenuVisible, setIsMenuVisible] = useState(false);
@@ -123,6 +124,7 @@ const UserMessage: React.FC<UserMessageProps> = ({
 
 
   const handlePressStart = (e: React.MouseEvent | React.TouchEvent) => {
+    if (isSelectionMode) return;
     e.stopPropagation();
     pressTimer.current = setTimeout(() => {
         if ('vibrate' in navigator) navigator.vibrate(20);
@@ -178,7 +180,7 @@ const UserMessage: React.FC<UserMessageProps> = ({
 
   return (
       <div id={messageId} className="flex justify-end">
-          <div className="flex flex-col items-end gap-2" onMouseDown={handlePressStart} onMouseUp={handlePressEnd} onMouseLeave={handlePressEnd} onTouchStart={handlePressStart} onTouchEnd={handlePressEnd} style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}>
+          <div className="flex flex-col items-end gap-2" onMouseDown={isSelectionMode ? undefined : handlePressStart} onMouseUp={isSelectionMode ? undefined : handlePressEnd} onMouseLeave={isSelectionMode ? undefined : handlePressEnd} onTouchStart={isSelectionMode ? undefined : handlePressStart} onTouchEnd={isSelectionMode ? undefined : handlePressEnd} style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}>
               {url && (
                  <a 
                     href={url.startsWith('http') ? url : `https://${url}`} 
@@ -252,7 +254,7 @@ const UserMessage: React.FC<UserMessageProps> = ({
                   </div>
               )}
               
-              {isMenuVisible && (
+              {isMenuVisible && !isSelectionMode && (
                   <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                       <button onClick={handleEdit} className="text-neutral-500 dark:text-gray-400 hover:text-neutral-800 dark:hover:text-gray-200 transition-colors" aria-label="Edit"><Pencil className="h-5 w-5" /></button>
                       <button onClick={handleCopy} className="text-neutral-500 dark:text-gray-400 hover:text-neutral-800 dark:hover:text-gray-200 transition-colors" aria-label="Copy">{isCopied ? <Check className="h-5 w-5 text-green-500" /> : <Copy className="h-5 w-5" />}</button>

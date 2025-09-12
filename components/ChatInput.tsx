@@ -188,7 +188,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         setInput(activeSuggestion.prompt);
     }
   }, [activeSuggestion, setInput]);
-  
+
     const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
         const selectedFiles = event.target.files;
         if (!selectedFiles || selectedFiles.length === 0) return;
@@ -326,6 +326,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const SelectedIcon = selectedToolObject.icon;
   
   const placeholderText = () => {
+      if (isLoading) return "Processing...";
       if (isListening) return "Listening...";
       if (selectedTool === 'urlReader') return "Ask a question about the URL above...";
       if (images.length > 0) return `Ask a question about the ${images.length} image(s)...`;
@@ -350,7 +351,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   // The button should be disabled for sending if attachments are processing or if there's no content.
-  const isSendActionDisabled = isProcessingAttachment || (images.length === 0 && !file && !input.trim() && (selectedTool !== 'urlReader' || !urlInput.trim()));
+  const isSendActionDisabled = isLoading || isProcessingAttachment || (images.length === 0 && !file && !input.trim() && (selectedTool !== 'urlReader' || !urlInput.trim()));
 
   const MicButton = () => (
     <button
@@ -517,7 +518,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     )}
                 </div>
 
-                <button onClick={isLoading ? onCancelStream : handleSend} disabled={isLoading ? false : isSendActionDisabled} className={`flex items-center justify-center transition-all duration-300 ${isLoading ? 'bg-red-600 hover:bg-red-500 h-10 rounded-full' : 'bg-black dark:bg-white text-white dark:text-black disabled:bg-neutral-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed w-10 h-10 rounded-full'}`} aria-label={isLoading ? `Stop generating (${formatTime(elapsedTime)})` : "Send message"}>
+                <button onClick={isLoading ? onCancelStream : handleSend} disabled={isSendActionDisabled} className={`flex items-center justify-center transition-all duration-300 ${isLoading ? 'bg-red-600 hover:bg-red-500 h-10 rounded-full' : 'bg-black dark:bg-white text-white dark:text-black disabled:bg-neutral-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed w-10 h-10 rounded-full'}`} aria-label={isLoading ? `Stop generating (${formatTime(elapsedTime)})` : "Send message"}>
                     {isLoading ? (
                       <div className="flex items-center justify-center gap-2 px-3 text-white w-full">
                           <div className="relative w-6 h-6">

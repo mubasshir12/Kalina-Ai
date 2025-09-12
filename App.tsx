@@ -21,6 +21,7 @@ import Globe from './components/Globe';
 import ImageModal from './components/ImageModal';
 import CodePreviewModal from './components/CodePreviewModal';
 import { useScrollSpy } from './hooks/useScrollSpy';
+import { Trash2 } from 'lucide-react';
 
 const models: ModelInfo[] = [
     { id: 'gemini-2.5-flash', name: 'Kalina 2.5 Flash', description: 'Optimized for speed and efficiency.' },
@@ -62,6 +63,9 @@ const App: React.FC = () => {
     // State for chat input, lifted to manage from full-screen editor
     const [input, setInput] = useState('');
 
+    // State for contextual suggestions from the AI
+    const [suggestions, setSuggestions] = useState<string[]>([]);
+
 
     // Dev Console State
     const { logs, clearLogs } = useDebug();
@@ -75,6 +79,10 @@ const App: React.FC = () => {
     const [viewingUsageConvoId, setViewingUsageConvoId] = useState<string | null>(null);
     const [viewingConvo, setViewingConvo] = useState<{ user: ChatMessage; model: ChatMessage; serialNumber: number } | null>(null);
 
+    // State for message selection and deletion
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -97,7 +105,8 @@ const App: React.FC = () => {
         setLtm,
         setCodeMemory,
         setUserProfile,
-        setActiveSuggestion
+        setActiveSuggestion,
+        setSuggestions,
     });
 
     const { activeConversation, sortedConversations, handleNewChat, handleSelectConversation } = conversationManager;
@@ -238,6 +247,9 @@ const App: React.FC = () => {
         setImages([]);
         setFile(null);
         setInput('');
+        setSuggestions([]);
+        setIsSelectionMode(false);
+        setSelectedMessageIds(new Set());
     }, [chatHandler]);
 
     const onNewChat = useCallback(() => {
@@ -294,6 +306,7 @@ const App: React.FC = () => {
     }, [handleSendMessage, conversationManager.conversations, conversationManager.activeConversationId]);
 
     const handleSendMessageWrapper = useCallback((prompt: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; size: number; }, url?: string, isRetry = false) => {
+        setSuggestions([]);
         if (selectedChatModel !== 'gemini-2.5-pro' && isCodeRelated(prompt) && !isRetry) {
             setPendingPrompt({ prompt, images, file, url });
             setIsModelSwitchModalOpen(true);
@@ -306,6 +319,11 @@ const App: React.FC = () => {
             setInput('');
         }
     }, [selectedChatModel, executeSendMessage]);
+
+    const handleSendSuggestion = (suggestionText: string) => {
+        setInput(suggestionText);
+        handleSendMessageWrapper(suggestionText);
+    };
 
     const handleConfirmSwitch = () => {
         if (!pendingPrompt) return;
@@ -421,6 +439,49 @@ const App: React.FC = () => {
         setCurrentView('chat');
     };
 
+    const onToggleSelectionMode = useCallback(() => {
+        setIsSelectionMode(prev => !prev);
+        setSelectedMessageIds(new Set());
+    }, []);
+
+    const handleToggleMessageSelection = (userMessageId: string) => {
+        setSelectedMessageIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(userMessageId)) {
+                newSet.delete(userMessageId);
+            } else {
+                newSet.add(userMessageId);
+            }
+            return newSet;
+        });
+    };
+
+    const handleDeleteSelected = () => {
+        if (selectedMessageIds.size > 0) {
+            setIsDeleteConfirmOpen(true);
+        }
+    };
+
+    const onConfirmDelete = () => {
+        if (!activeConversation) return;
+        conversationManager.updateConversationMessages(activeConversation.id, prevMessages => {
+            const messagesToDelete = new Set<string>();
+            selectedMessageIds.forEach(userMsgId => {
+                const userMsgIndex = prevMessages.findIndex(m => m.id === userMsgId);
+                if (userMsgIndex !== -1) {
+                    messagesToDelete.add(userMsgId);
+                    if (userMsgIndex + 1 < prevMessages.length && prevMessages[userMsgIndex + 1].role === 'model') {
+                        messagesToDelete.add(prevMessages[userMsgIndex + 1].id);
+                    }
+                }
+            });
+            return prevMessages.filter(m => !messagesToDelete.has(m.id));
+        });
+        setIsSelectionMode(false);
+        setSelectedMessageIds(new Set());
+        setIsDeleteConfirmOpen(false);
+    };
+
     const showConsoleToggleButton = consoleMode === 'manual' || (consoleMode === 'auto' && logs.length > 0);
 
     return (
@@ -438,6 +499,9 @@ const App: React.FC = () => {
                     setConsoleMode={setConsoleMode}
                     onOpenHistory={() => setIsHistorySheetOpen(true)}
                     conversationCount={conversationManager.conversations.length}
+                    isSelectionMode={isSelectionMode}
+                    onToggleSelectionMode={onToggleSelectionMode}
+                    hasActiveConversation={!!activeConversation && activeConversation.messages.length > 0}
                 />
 
                 <ViewRenderer
@@ -472,43 +536,84 @@ const App: React.FC = () => {
                     editorInitialText={input}
                     onSaveEditedImage={handleSaveEditedImage}
                     imageToEdit={imageToEdit}
+                    isSelectionMode={isSelectionMode}
+                    selectedMessageIds={selectedMessageIds}
+                    onToggleMessageSelection={handleToggleMessageSelection}
                 />
-
-                {currentView === 'chat' && (
-                    <div className="relative z-20 px-4 pb-4 pt-2 md:px-6 md:pb-6 md:pt-3 bg-white/5 dark:bg-black/5 backdrop-blur-sm border-t border-neutral-200/50 dark:border-white/10 rounded-tl-3xl rounded-tr-3xl">
-                        <div className="max-w-4xl mx-auto relative">
-                            
-                            <ChatInput
-                                onSendMessage={handleSendMessageWrapper}
-                                isLoading={chatHandler.isLoading}
-                                elapsedTime={elapsedTime}
-                                selectedTool={selectedTool}
-                                onToolChange={handleToolChange}
-                                activeSuggestion={activeSuggestion}
-                                onClearSuggestion={() => setActiveSuggestion(null)}
-                                onCancelStream={handleRequestCancelStream}
-                                models={models}
-                                selectedChatModel={selectedChatModel}
-                                onSelectChatModel={setSelectedChatModel}
-                                apiKey={apiKey}
-                                onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
-                                showConversationJumper={!showWelcomeScreen && messageIndices.length > 1}
-                                onNavigate={handleNavigate}
-                                isAtStartOfConversation={isAtStart}
-                                isAtEndOfConversation={isAtEnd}
-                                images={images}
-                                setImages={setImages}
-                                file={file}
-                                setFile={setFile}
-                                setModalImage={setModalImage}
-                                onEditImage={handleStartEditImage}
-                                input={input}
-                                setInput={setInput}
-                                onOpenFullScreenEditor={handleOpenFullScreenEditor}
-                            />
+                
+                <div className="relative">
+                    {isSelectionMode && selectedMessageIds.size > 0 && (
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 w-full max-w-4xl px-4 pb-2 z-30 pointer-events-none">
+                            <div className="flex items-center justify-between gap-4 bg-white/80 dark:bg-[#1e1f22]/80 backdrop-blur-md rounded-xl p-3 shadow-lg border border-neutral-200 dark:border-gray-700 w-full sm:w-auto sm:min-w-[300px] mx-auto pointer-events-auto">
+                                <span className="font-semibold text-neutral-800 dark:text-gray-200 text-sm">{selectedMessageIds.size} turn{selectedMessageIds.size > 1 ? 's' : ''} selected</span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setSelectedMessageIds(new Set())}
+                                        className="px-3 py-1.5 text-sm font-semibold text-neutral-700 dark:text-gray-300 rounded-lg hover:bg-neutral-200 dark:hover:bg-gray-700/60 transition-colors"
+                                    >
+                                        Deselect All
+                                    </button>
+                                    <button
+                                        onClick={handleDeleteSelected}
+                                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
+
+                    {currentView === 'chat' && !isSelectionMode && (
+                        <div className="relative z-20 px-4 pb-4 pt-2 md:px-6 md:pb-6 md:pt-3 bg-white/5 dark:bg-black/5 backdrop-blur-sm border-t border-neutral-200/50 dark:border-white/10 rounded-tl-3xl rounded-tr-3xl">
+                            <div className="max-w-4xl mx-auto relative">
+                                {suggestions.length > 0 && !input && (
+                                    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide mb-2">
+                                        {suggestions.map((suggestion, index) => (
+                                            <button
+                                                key={index}
+                                                onClick={() => handleSendSuggestion(suggestion)}
+                                                className="animate-fade-in-up flex-shrink-0 px-3 py-1.5 text-sm font-medium bg-neutral-100 dark:bg-[#2E2F33] text-neutral-700 dark:text-gray-300 rounded-full hover:bg-neutral-200 dark:hover:bg-gray-700/70 transition-colors"
+                                                style={{ animationDelay: `${index * 75}ms` }}
+                                            >
+                                                {suggestion}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                <ChatInput
+                                    onSendMessage={handleSendMessageWrapper}
+                                    isLoading={chatHandler.isLoading}
+                                    elapsedTime={elapsedTime}
+                                    selectedTool={selectedTool}
+                                    onToolChange={handleToolChange}
+                                    activeSuggestion={activeSuggestion}
+                                    onClearSuggestion={() => setActiveSuggestion(null)}
+                                    onCancelStream={handleRequestCancelStream}
+                                    models={models}
+                                    selectedChatModel={selectedChatModel}
+                                    onSelectChatModel={setSelectedChatModel}
+                                    apiKey={apiKey}
+                                    onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
+                                    showConversationJumper={!showWelcomeScreen && messageIndices.length > 1}
+                                    onNavigate={handleNavigate}
+                                    isAtStartOfConversation={isAtStart}
+                                    isAtEndOfConversation={isAtEnd}
+                                    images={images}
+                                    setImages={setImages}
+                                    file={file}
+                                    setFile={setFile}
+                                    setModalImage={setModalImage}
+                                    onEditImage={handleStartEditImage}
+                                    input={input}
+                                    setInput={setInput}
+                                    onOpenFullScreenEditor={handleOpenFullScreenEditor}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
                 
                 {IS_DEV_CONSOLE_ENABLED && (
                     <>
@@ -565,6 +670,16 @@ const App: React.FC = () => {
                 title="Stop Generation"
                 message="Are you sure you want to stop generating the response?"
                 confirmButtonText="Stop"
+                confirmButtonVariant="danger"
+            />
+
+            <ConfirmationModal
+                isOpen={isDeleteConfirmOpen}
+                onClose={() => setIsDeleteConfirmOpen(false)}
+                onConfirm={onConfirmDelete}
+                title="Delete Messages"
+                message={`Are you sure you want to permanently delete these ${selectedMessageIds.size} message pairs? This action cannot be undone.`}
+                confirmButtonText="Delete"
                 confirmButtonVariant="danger"
             />
             

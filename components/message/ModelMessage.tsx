@@ -1,6 +1,3 @@
-
-
-
 import React from 'react';
 import { ChatMessage as ChatMessageType } from '../../types';
 import MessageContent from './MessageContent';
@@ -15,10 +12,11 @@ interface ModelMessageProps extends ChatMessageType {
     onRetry?: () => void;
     index: number;
     setCodeForPreview: (data: { code: string; language: string; } | null) => void;
+    isSelectionMode?: boolean;
 }
 
 const ModelMessage: React.FC<ModelMessageProps> = (props) => {
-    const showToolbar = !props.isStreaming && props.content;
+    const showToolbar = !props.isStreaming && props.content && !props.isSelectionMode;
     const showMetadata = !props.isStreaming && (props.modelUsed || typeof props.inputTokens === 'number' || typeof props.outputTokens === 'number' || (props.generationTime && props.generationTime > 0));
 
     return (

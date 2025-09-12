@@ -13,6 +13,7 @@ interface ChatMessageProps extends ChatMessageType {
   onCancelStream?: () => void;
   setModalImage: (url: string | null) => void;
   setCodeForPreview: (data: { code: string; language: string; } | null) => void;
+  isSelectionMode?: boolean;
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = (props) => {

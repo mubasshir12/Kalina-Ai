@@ -10,7 +10,7 @@ const stripCodeBlocks = (text: string): string => {
 };
 
 
-const getMemoryUpdateSystemInstruction = (userName: string | null): string => `You are a selective memory AI. Your goal is to extract, update, and manage long-term facts about the user.
+const getMemoryUpdateSystemInstruction = (userName: string | null): string => `You are a selective memory AI. Your goal is to extract, update, and manage long-term facts about the user AND provide relevant follow-up suggestions.
 
 **User Info:**
 - Current Name: ${userName || 'Unknown'}
@@ -21,6 +21,7 @@ const getMemoryUpdateSystemInstruction = (userName: string | null): string => `Y
 3.  **Update Existing Facts:** If new info contradicts an existing fact in 'CURRENT LTM', create an update operation specifying the 'old_memory' and 'new_memory'.
 4.  **Prioritize New Name:** When a new name is found, use it immediately in all new/updated facts in the same response. If no new name, use the current one or "The user" if unknown.
 5.  **Handle Explicit Saves:** If the user says "remember..." or "save...", you MUST save the specified info as a new fact, overriding other filters.
+6.  **Generate Suggestions:** Based on the last conversation turn, generate 4-5 short, engaging, and contextually relevant follow-up questions or prompts that the user might want to ask next. These should be phrased from the user's perspective (e.g., "Tell me more about X," or "How does that work?"). They should be diverse and encourage further conversation. This is a mandatory step; you MUST always provide suggestions, even if no memory changes are made.
 
 **Critical Filter (unless an explicit save command):**
 - **SAVE:** Long-term, personal facts about the user.
@@ -30,6 +31,7 @@ const getMemoryUpdateSystemInstruction = (userName: string | null): string => `Y
 - Do not add duplicate facts (rephrased info).
 - Do not add facts that contradict old ones; use an 'update' instead.
 - All facts should be written from a third-person perspective (e.g., "The user's favorite color is blue," not "My favorite color is blue").
+- Suggestions should be short (ideally under 10 words).
 
 **Output:**
 Respond ONLY with a valid JSON object matching the provided schema.`;
@@ -43,6 +45,7 @@ export interface MemoryUpdateResult {
     newMemories: string[];
     updatedMemories: MemoryUpdate[];
     userProfileUpdates: Partial<UserProfile>;
+    suggestions: string[];
 }
 
 
@@ -102,9 +105,13 @@ Analyze the conversation and LTM, then generate the JSON output as instructed.`;
                             properties: {
                                 name: { type: Type.STRING }
                             }
+                        },
+                        suggestions: {
+                            type: Type.ARRAY,
+                            items: { type: Type.STRING }
                         }
                     },
-                    required: ["new_memories", "updated_memories", "user_profile_updates"]
+                    required: ["new_memories", "updated_memories", "user_profile_updates", "suggestions"]
                 },
             }
         });
@@ -113,11 +120,12 @@ Analyze the conversation and LTM, then generate the JSON output as instructed.`;
         return {
             newMemories: parsed.new_memories || [],
             updatedMemories: parsed.updated_memories || [],
-            userProfileUpdates: parsed.user_profile_updates || {}
+            userProfileUpdates: parsed.user_profile_updates || {},
+            suggestions: parsed.suggestions || [],
         };
     } catch (error) {
         appLogger.error("Memory update API request failed", error);
-        return { newMemories: [], updatedMemories: [], userProfileUpdates: {} };
+        return { newMemories: [], updatedMemories: [], userProfileUpdates: {}, suggestions: [] };
     }
 };
 

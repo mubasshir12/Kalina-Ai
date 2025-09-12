@@ -39,6 +39,9 @@ interface ViewRendererProps {
     editorInitialText: string;
     onSaveEditedImage: (newBase64: string) => void;
     imageToEdit: { index: number; base64: string; mimeType: string; } | null;
+    isSelectionMode: boolean;
+    selectedMessageIds: Set<string>;
+    onToggleMessageSelection: (userMessageId: string) => void;
 }
 
 const ViewRenderer: React.FC<ViewRendererProps> = ({
@@ -69,7 +72,10 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
     onSaveEditor,
     editorInitialText,
     onSaveEditedImage,
-    imageToEdit
+    imageToEdit,
+    isSelectionMode,
+    selectedMessageIds,
+    onToggleMessageSelection
 }) => {
 
     switch (currentView) {
@@ -131,6 +137,9 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
                                                 scrollContainerRef={scrollContainerRef}
                                                 setModalImage={setModalImage}
                                                 setCodeForPreview={setCodeForPreview}
+                                                isSelectionMode={isSelectionMode}
+                                                selectedMessageIds={selectedMessageIds}
+                                                onToggleMessageSelection={onToggleMessageSelection}
                                             />
                                         )}
                                     </div>

@@ -1,6 +1,3 @@
-
-
-
 import React, { useState } from 'react';
 import { Copy, Check, RefreshCw, ThumbsUp, ThumbsDown } from 'lucide-react';
 
@@ -20,9 +17,10 @@ interface MessageToolbarProps {
     id: string;
     content: string;
     onRetry?: () => void;
+    isSelectionMode?: boolean;
 }
 
-const MessageToolbar: React.FC<MessageToolbarProps> = ({ id, content, onRetry }) => {
+const MessageToolbar: React.FC<MessageToolbarProps> = ({ id, content, onRetry, isSelectionMode }) => {
     const [isCopied, setIsCopied] = useState(false);
     const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
 
@@ -34,6 +32,10 @@ const MessageToolbar: React.FC<MessageToolbarProps> = ({ id, content, onRetry })
             setTimeout(() => setIsCopied(false), 2000);
         }
     };
+
+    if (isSelectionMode) {
+        return null;
+    }
 
     return (
         <div className="mt-3 flex items-center gap-2 text-neutral-500 dark:text-gray-400">

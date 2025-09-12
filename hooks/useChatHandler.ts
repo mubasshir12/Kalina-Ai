@@ -67,7 +67,8 @@ export const useChatHandler = ({
     setLtm,
     setCodeMemory,
     setUserProfile,
-    setActiveSuggestion
+    setActiveSuggestion,
+    setSuggestions
 }) => {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [isThinking, setIsThinking] = useState<boolean>(false);
@@ -545,7 +546,7 @@ export const useChatHandler = ({
                 if (finalCleanedResponse.trim()) {
                     updateMemory([{ role: 'user', parts: [{ text: fullPrompt }] }, { role: 'model', parts: [{ text: finalCleanedResponse }] }], ltm, userProfile, modelToUse)
                         .then(memoryResult => {
-                            const { newMemories, updatedMemories, userProfileUpdates } = memoryResult;
+                            const { newMemories, updatedMemories, userProfileUpdates, suggestions } = memoryResult;
                             
                             let logParts: string[] = [];
                             if (userProfileUpdates.name) {
@@ -598,6 +599,11 @@ export const useChatHandler = ({
                             // Update user profile
                             if (userProfileUpdates.name && userProfileUpdates.name !== userProfile.name) {
                                 setUserProfile(prev => ({ ...prev, name: userProfileUpdates.name }));
+                            }
+
+                            // Set new suggestions
+                            if (suggestions && suggestions.length > 0) {
+                                setSuggestions(suggestions);
                             }
                         });
                 }
@@ -682,7 +688,8 @@ export const useChatHandler = ({
     }, [
         apiKey, isLoading, activeConversationId, conversations, selectedChatModel, selectedTool, ltm, codeMemory, userProfile,
         setConversations, setActiveConversationId, setError, setIsLoading, updateConversationMessages, 
-        updateConversation, setCodeMemory, setLtm, setUserProfile, setActiveSuggestion, clearThinkingIntervals, stopResponseTimer, logError, addLog
+        updateConversation, setCodeMemory, setLtm, setUserProfile, setActiveSuggestion, setSuggestions,
+        clearThinkingIntervals, stopResponseTimer, logError, addLog
     ]);
 
     return {
