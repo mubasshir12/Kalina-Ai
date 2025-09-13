@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { BrainCircuit, BarChart3, Terminal, ListChecks } from 'lucide-react';
+import { BrainCircuit, BarChart3, Terminal, ListChecks, HardDrive } from 'lucide-react';
 import { ConsoleMode } from '../types';
 import { IS_DEV_CONSOLE_ENABLED } from '../config';
 import { useDraggableSheet } from '../hooks/useDraggableSheet';
@@ -9,6 +9,7 @@ interface MenuSheetProps {
     onClose: () => void;
     onShowMemory: () => void;
     onShowUsage: () => void;
+    onShowStorage: () => void;
     consoleMode: ConsoleMode;
     setConsoleMode: (mode: ConsoleMode) => void;
     isChatView: boolean;
@@ -22,6 +23,7 @@ const MenuSheet: React.FC<MenuSheetProps> = ({
     onClose,
     onShowMemory,
     onShowUsage,
+    onShowStorage,
     consoleMode,
     setConsoleMode,
     isChatView,
@@ -63,6 +65,10 @@ const MenuSheet: React.FC<MenuSheetProps> = ({
                         <button onClick={() => handleLinkClick(onShowMemory)} className="w-full flex items-center gap-4 p-3 text-left text-base font-medium text-neutral-700 dark:text-gray-300 rounded-lg hover:bg-neutral-100 dark:hover:bg-gray-800/60 transition-colors">
                             <BrainCircuit className="h-6 w-6 text-neutral-500 dark:text-gray-400" />
                             <span>Memory Management</span>
+                        </button>
+                         <button onClick={() => handleLinkClick(onShowStorage)} className="w-full flex items-center gap-4 p-3 text-left text-base font-medium text-neutral-700 dark:text-gray-300 rounded-lg hover:bg-neutral-100 dark:hover:bg-gray-800/60 transition-colors">
+                            <HardDrive className="h-6 w-6 text-neutral-500 dark:text-gray-400" />
+                            <span>Storage Management</span>
                         </button>
 
                         {isChatView && hasActiveConversation && (

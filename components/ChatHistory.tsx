@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { ChatMessage as ChatMessageType } from '../types';
+import { ChatMessage as ChatMessageType, MoleculeData } from '../types';
 import ChatMessage from './ChatMessage';
 
 interface ChatHistoryProps {
@@ -16,6 +16,7 @@ interface ChatHistoryProps {
   isSelectionMode: boolean;
   selectedMessageIds: Set<string>;
   onToggleMessageSelection: (userMessageId: string) => void;
+  onMaximizeMoleculeViewer: (molecule: MoleculeData) => void;
 }
 
 const ChatHistory: React.FC<ChatHistoryProps> = ({ 
@@ -31,7 +32,8 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({
   setCodeForPreview,
   isSelectionMode,
   selectedMessageIds,
-  onToggleMessageSelection
+  onToggleMessageSelection,
+  onMaximizeMoleculeViewer
 }) => {
   const [isLockedToBottom, setIsLockedToBottom] = useState(true);
 
@@ -88,9 +90,9 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({
                     className={`transition-colors duration-200 rounded-lg ${isSelectionMode && canSelect ? 'cursor-pointer' : ''} ${isSelected ? 'bg-amber-50 dark:bg-amber-900/20' : ''}`}
                 >
                     <div className={isSelectionMode ? 'p-2' : ''}>
-                        <ChatMessage {...item.user} isSelectionMode={isSelectionMode} index={messages.findIndex(m => m.id === item.user.id)} onEditMessage={onEditMessage} setModalImage={setModalImage} setCodeForPreview={setCodeForPreview} />
+                        <ChatMessage {...item.user} isSelectionMode={isSelectionMode} index={messages.findIndex(m => m.id === item.user.id)} onEditMessage={onEditMessage} setModalImage={setModalImage} setCodeForPreview={setCodeForPreview} onMaximizeMoleculeViewer={onMaximizeMoleculeViewer} />
                         <div className="h-4" />
-                        <ChatMessage {...item.model} isSelectionMode={isSelectionMode} index={messages.findIndex(m => m.id === item.model.id)} onRetry={isLastPair && !isLoading && !isThinking ? onRetry : undefined} isStreaming={isLoading && isLastPair} isThinking={isThinking && isLastPair} isSearchingWeb={isSearchingWeb && isLastPair} setModalImage={setModalImage} setCodeForPreview={setCodeForPreview} />
+                        <ChatMessage {...item.model} isSelectionMode={isSelectionMode} index={messages.findIndex(m => m.id === item.model.id)} onRetry={isLastPair && !isLoading && !isThinking ? onRetry : undefined} isStreaming={isLoading && isLastPair} isThinking={isThinking && isLastPair} isSearchingWeb={isSearchingWeb && isLastPair} setModalImage={setModalImage} setCodeForPreview={setCodeForPreview} onMaximizeMoleculeViewer={onMaximizeMoleculeViewer} />
                     </div>
                 </div>
             );
@@ -109,6 +111,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({
                         isSearchingWeb={isSearchingWeb && isLastMessage}
                         setModalImage={setModalImage}
                         setCodeForPreview={setCodeForPreview}
+                        onMaximizeMoleculeViewer={onMaximizeMoleculeViewer}
                     />
                 </div>
             );

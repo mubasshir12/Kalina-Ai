@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChatMessage as ChatMessageType } from '../../types';
+import { ChatMessage as ChatMessageType, MoleculeData } from '../../types';
 import MessageContent from './MessageContent';
 import MessageToolbar from './MessageToolbar';
 import MessageMetadata from './MessageMetadata';
@@ -13,6 +13,7 @@ interface ModelMessageProps extends ChatMessageType {
     index: number;
     setCodeForPreview: (data: { code: string; language: string; } | null) => void;
     isSelectionMode?: boolean;
+    onMaximizeMoleculeViewer: (molecule: MoleculeData) => void;
 }
 
 const ModelMessage: React.FC<ModelMessageProps> = (props) => {

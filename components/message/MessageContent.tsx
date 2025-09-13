@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChatMessage as ChatMessageType } from '../../types';
+import { ChatMessage as ChatMessageType, MoleculeData } from '../../types';
 import MarkdownRenderer from '../MarkdownRenderer';
 import ThinkingProcess from '../ThinkingProcess';
 import WebSearchAnimation from '../WebSearchAnimation';
@@ -29,6 +29,7 @@ interface MessageContentProps extends ChatMessageType {
     isThinking?: boolean;
     isSearchingWeb?: boolean;
     setCodeForPreview: (data: { code: string; language: string; } | null) => void;
+    onMaximizeMoleculeViewer: (molecule: MoleculeData) => void;
 }
 
 const MessageContent: React.FC<MessageContentProps> = ({
@@ -49,6 +50,7 @@ const MessageContent: React.FC<MessageContentProps> = ({
     setCodeForPreview,
     isMoleculeRequest,
     molecule,
+    onMaximizeMoleculeViewer,
 }) => {
     const showThinkingProcess = isThinking || (thoughts && thoughts.length > 0);
 
@@ -93,7 +95,7 @@ const MessageContent: React.FC<MessageContentProps> = ({
                 isSearchingWeb ? <div className="flex justify-center items-center"><WebSearchAnimation plan={searchPlan} /></div> : <SkeletonLoader />
             )}
             
-            {molecule && <MoleculeViewer molecule={molecule} />}
+            {molecule && <MoleculeViewer molecule={molecule} onMaximize={() => onMaximizeMoleculeViewer(molecule)} />}
 
             <div className="text-neutral-800 dark:text-gray-200 leading-relaxed dark:blurry-text-effect">
             

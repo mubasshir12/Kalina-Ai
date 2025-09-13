@@ -86,6 +86,12 @@ export const useChatHandler = ({
     const { logError, addLog, addTokenLog } = useDebug();
     const summarizerInitialized = useRef(false);
 
+    // Create a ref to hold the latest conversations state to fix stale closures in the async handler.
+    const conversationsRef = useRef(conversations);
+    useEffect(() => {
+        conversationsRef.current = conversations;
+    }, [conversations]);
+
     useEffect(() => {
         if (!summarizerInitialized.current) {
             initializeSummarizer(updateConversation, addTokenLog);
@@ -516,9 +522,12 @@ export const useChatHandler = ({
             }
 
             const finalCleanedResponse = finalModelResponse.replace(/^\s*TITLE:\s*[^\n]*\n?/, '');
-            const finalConversationState = conversations.find(c => c.id === currentConversationId);
             
-            if (finalConversationState && !isCancelledRef.current) {
+            // FIX: Use the ref to get the most up-to-date conversations state.
+            const finalConversationState = conversationsRef.current.find(c => c.id === currentConversationId);
+            
+            // USER SUGGESTION & BUG FIX: Skip memory/suggestion logic on the very first turn.
+            if (!isFirstTurnInConversation && finalConversationState && !isCancelledRef.current) {
                  // New 'convo' summarization logic
                 if (finalConversationState.messages.length > 0 && finalConversationState.messages.length % 20 === 0) {
                     const convosToSummarize = [];

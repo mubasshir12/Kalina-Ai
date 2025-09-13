@@ -1,3 +1,5 @@
+
+
 import React, { useState, KeyboardEvent, useRef, ChangeEvent, useEffect } from 'react';
 import { Suggestion, Tool, ChatModel, ModelInfo } from '../types';
 import { Sparkles, ChevronDown, X, Paperclip, ArrowUp, Globe, BrainCircuit, Image, Expand, File, Presentation, FileText, Camera, Languages, Link, ClipboardPaste, ChevronUp, Mic, FlaskConical, Pencil, Maximize2 } from 'lucide-react';
@@ -37,6 +39,11 @@ interface SpeechRecognitionAlternative {
     readonly transcript: string;
 }
 
+type KeywordSuggestion = {
+    text: string;
+    type: 'code' | 'english';
+}
+
 interface ChatInputProps {
   onSendMessage: (message: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; size: number; }, url?: string) => void;
   isLoading: boolean;
@@ -64,6 +71,8 @@ interface ChatInputProps {
   input: string;
   setInput: React.Dispatch<React.SetStateAction<string>>;
   onOpenFullScreenEditor: () => void;
+  codeKeywords: string[];
+  englishWords: string[];
 }
 
 const tools: { id: Tool; name: string; description: string; icon: React.ElementType }[] = [
@@ -115,12 +124,15 @@ const ChatInput: React.FC<ChatInputProps> = ({
     input,
     setInput,
     onOpenFullScreenEditor,
+    codeKeywords,
+    englishWords,
 }) => {
   const [urlInput, setUrlInput] = useState('');
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false);
   const [isProcessingAttachment, setIsProcessingAttachment] = useState(false);
   const [isMaxHeight, setIsMaxHeight] = useState(false);
+  const [keywordSuggestions, setKeywordSuggestions] = useState<KeywordSuggestion[]>([]);
   
   const [isListening, setIsListening] = useState(false);
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
@@ -322,6 +334,57 @@ const ChatInput: React.FC<ChatInputProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   
+    useEffect(() => {
+        if (!input.trim() || isLoading || activeSuggestion || (codeKeywords.length === 0 && englishWords.length === 0)) {
+            setKeywordSuggestions([]);
+            return;
+        }
+
+        const lastWordRegex = /[\w.]+$/;
+        const match = input.match(lastWordRegex);
+        const lastWord = match ? match[0].toLowerCase() : '';
+
+        if (!lastWord || lastWord.length < 2) {
+            setKeywordSuggestions([]);
+            return;
+        }
+
+        const codeSuggestions = codeKeywords
+            .filter(k => k.toLowerCase().startsWith(lastWord) && k.toLowerCase() !== lastWord)
+            .map(k => ({ text: k, type: 'code' as const }));
+
+        const englishSuggestions = englishWords
+            .filter(k => k.toLowerCase().startsWith(lastWord) && k.toLowerCase() !== lastWord)
+            .map(k => ({ text: k, type: 'english' as const }));
+
+        const combined = [...codeSuggestions, ...englishSuggestions];
+        const uniqueMap = new Map<string, KeywordSuggestion>();
+        combined.forEach(item => {
+            if (!uniqueMap.has(item.text)) {
+                uniqueMap.set(item.text, item);
+            }
+        });
+
+        const uniqueSuggestions = Array.from(uniqueMap.values()).slice(0, 7);
+        setKeywordSuggestions(uniqueSuggestions);
+
+    }, [input, isLoading, activeSuggestion, codeKeywords, englishWords]);
+
+    const handleKeywordClick = (keyword: string) => {
+        const lastWordRegex = /[\w.]+$/;
+        const match = input.match(lastWordRegex);
+
+        if (match && typeof match.index === 'number') {
+            const newInput = input.substring(0, match.index) + keyword + ' ';
+            setInput(newInput);
+        } else {
+            setInput(input + keyword + ' ');
+        }
+
+        setKeywordSuggestions([]);
+        textareaRef.current?.focus();
+    };
+
   const selectedToolObject = tools.find(t => t.id === selectedTool) || tools[0];
   const SelectedIcon = selectedToolObject.icon;
   
@@ -351,7 +414,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   // The button should be disabled for sending if attachments are processing or if there's no content.
-  const isSendActionDisabled = isLoading || isProcessingAttachment || (images.length === 0 && !file && !input.trim() && (selectedTool !== 'urlReader' || !urlInput.trim()));
+  const isSendDisabled = isProcessingAttachment || (images.length === 0 && !file && !input.trim() && (selectedTool !== 'urlReader' || !urlInput.trim()));
 
   const MicButton = () => (
     <button
@@ -445,6 +508,24 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   </button>
               </Tooltip>
             )}
+             {keywordSuggestions.length > 0 && (
+              <div className="flex items-center gap-2 overflow-x-auto pb-3 scrollbar-hide">
+                  {keywordSuggestions.map((suggestion, index) => (
+                      <button
+                          key={index}
+                          onClick={() => handleKeywordClick(suggestion.text)}
+                          className={`animate-fade-in-up flex-shrink-0 px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                            suggestion.type === 'code'
+                                ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/60'
+                                : 'bg-neutral-100 dark:bg-[#2E2F33] text-neutral-700 dark:text-gray-300 hover:bg-neutral-200 dark:hover:bg-gray-700/70'
+                          }`}
+                          style={{ animationDelay: `${index * 50}ms` }}
+                      >
+                          {suggestion.text}
+                      </button>
+                  ))}
+              </div>
+            )}
             <div className="flex-1">
                  <textarea ref={textareaRef} rows={1} value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={handleKeyPress} onPaste={handlePaste} placeholder={placeholderText()} disabled={isLoading} className="w-full bg-transparent text-neutral-800 dark:text-gray-200 placeholder:text-neutral-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-0 transition-all duration-300 disabled:opacity-50 resize-none max-h-[8rem] overflow-y-auto scrollbar-hide cursor-text" />
             </div>
@@ -518,7 +599,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     )}
                 </div>
 
-                <button onClick={isLoading ? onCancelStream : handleSend} disabled={isSendActionDisabled} className={`flex items-center justify-center transition-all duration-300 ${isLoading ? 'bg-red-600 hover:bg-red-500 h-10 rounded-full' : 'bg-black dark:bg-white text-white dark:text-black disabled:bg-neutral-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed w-10 h-10 rounded-full'}`} aria-label={isLoading ? `Stop generating (${formatTime(elapsedTime)})` : "Send message"}>
+                <button onClick={isLoading ? onCancelStream : handleSend} disabled={isLoading ? false : isSendDisabled} className={`flex items-center justify-center transition-all duration-300 ${isLoading ? 'bg-red-600 hover:bg-red-500 h-10 rounded-full' : 'bg-black dark:bg-white text-white dark:text-black disabled:bg-neutral-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed w-10 h-10 rounded-full'}`} aria-label={isLoading ? `Stop generating (${formatTime(elapsedTime)})` : "Send message"}>
                     {isLoading ? (
                       <div className="flex items-center justify-center gap-2 px-3 text-white w-full">
                           <div className="relative w-6 h-6">

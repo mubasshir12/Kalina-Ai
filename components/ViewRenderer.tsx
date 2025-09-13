@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Conversation, LTM, Suggestion, View, ChatMessage } from '../types';
+import { Conversation, LTM, Suggestion, View, ChatMessage, MoleculeData } from '../types';
 import ChatHistory from './ChatHistory';
 import WelcomeScreen from './WelcomeScreen';
 import MemoryManagement from './MemoryManagement';
@@ -9,6 +10,25 @@ import UsageDetailView from './UsageDetailView';
 import ConvoDetailView from './ConvoDetailView';
 import FullScreenEditor from './FullScreenEditor';
 import ImageEditorView from './ImageEditorView';
+import StorageManagement from './StorageManagement';
+import MoleculeViewer from './MoleculeViewer';
+import { ArrowLeft } from 'lucide-react';
+
+const FullScreenMoleculeView: React.FC<{ molecule: MoleculeData; onBack: () => void; }> = ({ molecule, onBack }) => {
+    return (
+        <main className="relative z-10 flex-1 flex flex-col p-4 md:p-6 overflow-hidden h-full">
+            <div className="flex items-center mb-6 flex-shrink-0">
+                <button onClick={onBack} className="p-2 rounded-full hover:bg-neutral-200/50 dark:hover:bg-gray-800/50 transition-colors mr-2 md:mr-4" aria-label="Back to chat">
+                    <ArrowLeft className="h-6 w-6" />
+                </button>
+                <h1 className="text-2xl md:text-3xl font-bold text-neutral-800 dark:text-gray-200">Molecule Viewer</h1>
+            </div>
+            <div className="flex-1 flex flex-col min-h-0 bg-neutral-200 dark:bg-gray-900 rounded-2xl overflow-hidden">
+                <MoleculeViewer molecule={molecule} isFullScreen={true} />
+            </div>
+        </main>
+    );
+};
 
 interface ViewRendererProps {
     currentView: View;
@@ -42,6 +62,8 @@ interface ViewRendererProps {
     isSelectionMode: boolean;
     selectedMessageIds: Set<string>;
     onToggleMessageSelection: (userMessageId: string) => void;
+    moleculeForFullScreen: MoleculeData | null;
+    onMaximizeMoleculeViewer: (molecule: MoleculeData) => void;
 }
 
 const ViewRenderer: React.FC<ViewRendererProps> = ({
@@ -75,7 +97,9 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
     imageToEdit,
     isSelectionMode,
     selectedMessageIds,
-    onToggleMessageSelection
+    onToggleMessageSelection,
+    moleculeForFullScreen,
+    onMaximizeMoleculeViewer
 }) => {
 
     switch (currentView) {
@@ -111,6 +135,15 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
                     mimeType={imageToEdit.mimeType}
                 />
             ) : null;
+        case 'storage':
+            return <StorageManagement onBack={() => setCurrentView('chat')} />;
+        case 'molecule-viewer':
+            return moleculeForFullScreen ? (
+                <FullScreenMoleculeView 
+                    molecule={moleculeForFullScreen}
+                    onBack={() => setCurrentView('chat')}
+                />
+            ) : null;
         case 'chat':
         default:
             return (
@@ -140,6 +173,7 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
                                                 isSelectionMode={isSelectionMode}
                                                 selectedMessageIds={selectedMessageIds}
                                                 onToggleMessageSelection={onToggleMessageSelection}
+                                                onMaximizeMoleculeViewer={onMaximizeMoleculeViewer}
                                             />
                                         )}
                                     </div>

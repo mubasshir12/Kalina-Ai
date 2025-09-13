@@ -7,6 +7,7 @@ import MenuSheet from './MenuSheet';
 interface HeaderProps {
     onShowMemory: () => void;
     onShowUsage: () => void;
+    onShowStorage: () => void;
     isChatView: boolean;
     consoleMode: ConsoleMode;
     setConsoleMode: (mode: ConsoleMode) => void;
@@ -66,6 +67,7 @@ const Header: React.FC<HeaderProps> = (props) => {
         onClose={() => setIsMenuSheetOpen(false)}
         onShowMemory={props.onShowMemory}
         onShowUsage={props.onShowUsage}
+        onShowStorage={props.onShowStorage}
         consoleMode={props.consoleMode}
         setConsoleMode={props.setConsoleMode}
         isChatView={props.isChatView}
