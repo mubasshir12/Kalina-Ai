@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Suggestion, Tool, ChatModel, ModelInfo, View, ConsoleMode, ChatMessage, MoleculeData } from './types';
 import { initializeAiClient } from './services/aiClient';
@@ -668,7 +660,7 @@ const App: React.FC = () => {
                     )}
                 </div>
                 
-                {IS_DEV_CONSOLE_ENABLED && (
+                {IS_DEV_CONSOLE_ENABLED && consoleMode !== 'disabled' && (
                     <>
                         {showConsoleToggleButton && !isConsoleOpen && !isDevConsoleVisible && (
                             <ConsoleToggleButton
@@ -683,6 +675,7 @@ const App: React.FC = () => {
                             mode={consoleMode}
                             logs={logs}
                             clearLogs={clearLogs}
+                            onNavigateToAnalysis={() => setCurrentView('word-analysis')}
                         />
                     </>
                 )}

@@ -1,4 +1,3 @@
-
 import { Conversation, LTM, CodeSnippet, UserProfile } from '../types';
 
 const DB_NAME = 'KalinaAppDB';
@@ -128,18 +127,30 @@ export const getTranslatorUsage = () => getFromDB<{ input: number, output: numbe
 export const saveTranslatorUsage = (usage: { input: number, output: number }) => saveToDB(STORES.TRANSLATOR_USAGE, usage, SINGLETON_KEY);
 
 // Word list functions
-export const addWords = async (words: string[]) => {
+export const addWords = async (words: string[]): Promise<void> => {
+    if (words.length === 0) return;
     const dbInstance = await openDB();
-    const transaction = dbInstance.transaction(STORES.WORDS, 'readwrite');
-    const store = transaction.objectStore(STORES.WORDS);
-    words.forEach(word => { store.put(word, word); });
-    return new Promise<void>((resolve, reject) => {
+    return new Promise((resolve, reject) => {
+        const transaction = dbInstance.transaction(STORES.WORDS, 'readwrite');
+        const store = transaction.objectStore(STORES.WORDS);
+        words.forEach(word => { store.put(word, word); });
         transaction.oncomplete = () => resolve();
         transaction.onerror = () => reject(transaction.error);
     });
 };
 export const getAllWords = () => getAllFromDB<string>(STORES.WORDS);
 export const clearWords = () => clearStore(STORES.WORDS);
+export const overwriteWords = async (words: string[]): Promise<void> => {
+    const dbInstance = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = dbInstance.transaction(STORES.WORDS, 'readwrite');
+        const store = transaction.objectStore(STORES.WORDS);
+        store.clear();
+        words.forEach(word => { store.put(word, word); });
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+    });
+};
 
 
 // Storage Panel utility

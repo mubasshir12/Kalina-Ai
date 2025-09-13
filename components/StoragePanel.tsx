@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Database, HardDrive, MessageSquare, Brain, Code, User, Languages, List } from 'lucide-react';
 import { getStorageBreakdown, StoreUsageDetails } from '../services/dbService';
@@ -56,7 +58,7 @@ const StorageIndicator: React.FC<{
 };
 
 
-const StoragePanel: React.FC = () => {
+const StoragePanel: React.FC<{ excludeStores?: string[] }> = ({ excludeStores = [] }) => {
     const [dbEstimate, setDbEstimate] = useState<{ usage: number; quota: number } | null>(null);
     const [breakdown, setBreakdown] = useState<Record<string, StoreUsageDetails> | null>(null);
     const [localStorageUsage, setLocalStorageUsage] = useState<number>(0);
@@ -143,7 +145,8 @@ const StoragePanel: React.FC = () => {
             
             <div className="space-y-3">
                 {breakdown && Object.entries(breakdown)
-                    .filter(([, details]) => details.count > 0)
+                    // Fix: The 'details' object was not destructured from the array item in the filter, causing a reference error.
+                    .filter(([storeName, details]) => !excludeStores.includes(storeName) && details.count > 0)
                     .sort(([, a], [, b]) => b.size - a.size)
                     .map(([storeName, details]) => {
                         const meta = storeMetadata[storeName] || { title: storeName, icon: Database, color: 'bg-gray-500' };

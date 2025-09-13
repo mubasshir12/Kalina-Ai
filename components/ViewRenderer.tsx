@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Conversation, LTM, Suggestion, View, ChatMessage, MoleculeData } from '../types';
 import ChatHistory from './ChatHistory';
@@ -12,6 +11,7 @@ import FullScreenEditor from './FullScreenEditor';
 import ImageEditorView from './ImageEditorView';
 import StorageManagement from './StorageManagement';
 import MoleculeViewer from './MoleculeViewer';
+import WordAnalysisView from './WordAnalysisView';
 import { ArrowLeft } from 'lucide-react';
 
 const FullScreenMoleculeView: React.FC<{ molecule: MoleculeData; onBack: () => void; }> = ({ molecule, onBack }) => {
@@ -144,6 +144,8 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
                     onBack={() => setCurrentView('chat')}
                 />
             ) : null;
+        case 'word-analysis':
+            return <WordAnalysisView onBack={() => setCurrentView('chat')} />;
         case 'chat':
         default:
             return (

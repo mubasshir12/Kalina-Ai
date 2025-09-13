@@ -39,6 +39,23 @@ const MenuSheet: React.FC<MenuSheetProps> = ({
         onClose();
     };
 
+    const handleModeChange = () => {
+        if (consoleMode === 'auto') {
+            setConsoleMode('manual');
+        } else if (consoleMode === 'manual') {
+            setConsoleMode('disabled');
+        } else { // 'disabled'
+            setConsoleMode('auto');
+        }
+    };
+
+    const modeInfo: Record<ConsoleMode, { text: string, description: string }> = {
+        auto: { text: 'Auto', description: 'Shows on error' },
+        manual: { text: 'On', description: 'Always available' },
+        disabled: { text: 'Off', description: 'Completely disabled' }
+    };
+
+
     return (
         <>
             <div 
@@ -81,25 +98,20 @@ const MenuSheet: React.FC<MenuSheetProps> = ({
                         {IS_DEV_CONSOLE_ENABLED && (
                             <>
                                 <div className="border-t border-neutral-200 dark:border-gray-600 my-2" />
-                                <div className="p-3 text-neutral-700 dark:text-gray-300 rounded-lg hover:bg-neutral-100 dark:hover:bg-gray-800/60 transition-colors">
+                                <div className="p-3 text-neutral-700 dark:text-gray-300">
                                     <div className="flex items-center gap-4">
                                         <Terminal className="h-6 w-6 text-neutral-500 dark:text-gray-400" />
                                         <div className="flex-1">
                                             <span className="text-base font-medium">Developer Console</span>
                                             <p className="text-xs text-neutral-500 dark:text-gray-400">
-                                                {consoleMode === 'auto' ? 'Auto-shows on error' : 'Always visible'}
+                                                {modeInfo[consoleMode]?.description || '...'}
                                             </p>
                                         </div>
                                         <button
-                                            onClick={() => setConsoleMode(consoleMode === 'auto' ? 'manual' : 'auto')}
-                                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 dark:focus:ring-offset-[#1e1f22] ${consoleMode === 'manual' ? 'bg-amber-600' : 'bg-neutral-300 dark:bg-gray-600'}`}
-                                            role="switch"
-                                            aria-checked={consoleMode === 'manual'}
+                                            onClick={handleModeChange}
+                                            className="px-4 py-1.5 text-sm font-semibold rounded-full bg-neutral-200 dark:bg-gray-700 hover:bg-neutral-300 dark:hover:bg-gray-600 transition-colors"
                                         >
-                                            <span
-                                                aria-hidden="true"
-                                                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${consoleMode === 'manual' ? 'translate-x-5' : 'translate-x-0'}`}
-                                            />
+                                            {modeInfo[consoleMode]?.text || '...'}
                                         </button>
                                     </div>
                                 </div>

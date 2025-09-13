@@ -2,7 +2,7 @@ import React from 'react';
 
 export type ChatModel = 'gemini-2.5-flash' | 'gemini-2.5-pro' | 'gemini-2.5-flash-lite' | 'gemini-2.0-flash' | 'gemini-2.0-flash-lite';
 export type Tool = 'smart' | 'webSearch' | 'thinking' | 'translator' | 'urlReader' | 'chemistry';
-export type View = 'chat' | 'memory' | 'translator' | 'usage' | 'usage-detail' | 'convo-detail' | 'editor' | 'image-editor' | 'storage' | 'molecule-viewer';
+export type View = 'chat' | 'memory' | 'translator' | 'usage' | 'usage-detail' | 'convo-detail' | 'editor' | 'image-editor' | 'storage' | 'molecule-viewer' | 'word-analysis';
 
 export type MessageRole = 'user' | 'model';
 
@@ -86,6 +86,7 @@ export interface ChatMessage {
   generationTime?: number;
   isMoleculeRequest?: boolean;
   molecule?: MoleculeData;
+  moleculeNameForAnimation?: string;
 }
 
 export interface AppError {
@@ -147,7 +148,7 @@ export interface ConsoleLog {
 }
 
 // Types for the Developer Console
-export type ConsoleMode = 'auto' | 'manual';
+export type ConsoleMode = 'auto' | 'manual' | 'disabled';
 
 export interface ConsoleLogEntry {
     id: string;

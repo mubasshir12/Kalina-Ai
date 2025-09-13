@@ -51,6 +51,7 @@ const MessageContent: React.FC<MessageContentProps> = ({
     isMoleculeRequest,
     molecule,
     onMaximizeMoleculeViewer,
+    moleculeNameForAnimation,
 }) => {
     const showThinkingProcess = isThinking || (thoughts && thoughts.length > 0);
 
@@ -78,7 +79,7 @@ const MessageContent: React.FC<MessageContentProps> = ({
 
             {isPlanning && <SkeletonLoader />}
 
-            {isMoleculeRequest && <MoleculeAnimation />}
+            {isMoleculeRequest && <MoleculeAnimation moleculeName={moleculeNameForAnimation} />}
             
             {!isPlanning && toolInUse && <UrlReaderAnimation isLongToolUse={isLongToolUse} />}
 

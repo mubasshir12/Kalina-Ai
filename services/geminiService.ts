@@ -21,7 +21,7 @@ Set to true if the user asks who created you, your developer, or your origin.
 Set to true if the user asks what you can do, about your tools, or your abilities (e.g., "what are your skills?", "can you generate images?").
 
 **5. Molecule Visualization (isMoleculeRequest: true):**
-Set to true if the user asks to see a 3D model or structure of a chemical compound (e.g., "show me water in 3D", "what does caffeine look like?"). Extract the name of the compound into \`moleculeName\`.
+Set to true if the user asks to see a 3D model or structure of a chemical compound (e.g., "show me water in 3D", "what does caffeine look like?"). You MUST analyze the user's input, correct any spelling mistakes, and find the canonical name of the compound. Extract the corrected name into \`correctedMoleculeName\`.
 
 **6. File Analysis:**
 - If a file is attached, always set 'needsThinking' to true.
@@ -41,7 +41,7 @@ Respond ONLY with a valid JSON object based on the prompt analysis.
 - \`isCreatorRequest\` (boolean): User is asking about the developer.
 - \`isCapabilitiesRequest\` (boolean): User is asking about your abilities.
 - \`isMoleculeRequest\` (boolean): User is asking for a 3D model of a molecule.
-- \`moleculeName\` (string, optional): The name of the molecule if \`isMoleculeRequest\` is true.
+- \`correctedMoleculeName\` (string, optional): The corrected, canonical name of the molecule if \`isMoleculeRequest\` is true.
 - \`needsThinking\` (boolean): Complex task.
 - \`needsCodeContext\` (boolean): Prompt relates to previous code.
 - \`thoughts\` (array, optional): If 'needsThinking' is true, provide a step-by-step plan.
@@ -63,7 +63,7 @@ export interface ResponsePlan {
     needsThinking: boolean;
     needsCodeContext: boolean;
     isMoleculeRequest: boolean;
-    moleculeName?: string;
+    correctedMoleculeName?: string;
     thoughts: ThoughtStep[];
     searchPlan?: ThoughtStep[];
 }
@@ -111,7 +111,7 @@ export const planResponse = async (prompt: string, images?: { base64: string; mi
                         isCreatorRequest: { type: Type.BOOLEAN },
                         isCapabilitiesRequest: { type: Type.BOOLEAN },
                         isMoleculeRequest: { type: Type.BOOLEAN },
-                        moleculeName: { type: Type.STRING },
+                        correctedMoleculeName: { type: Type.STRING },
                         needsThinking: { type: Type.BOOLEAN },
                         needsCodeContext: { type: Type.BOOLEAN },
                         thoughts: {
@@ -172,6 +172,7 @@ export const planResponse = async (prompt: string, images?: { base64: string; mi
             needsThinking: !needsWebSearch, // Ensures thinking is false if web search is true
             needsCodeContext: false, // <-- Changed from true to false for token efficiency on error
             isMoleculeRequest: false,
+            correctedMoleculeName: undefined,
             thoughts: [], // No thoughts when thinking is disabled
             searchPlan: []
         };

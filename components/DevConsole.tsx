@@ -1,14 +1,13 @@
-
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ConsoleLogEntry, ConsoleMode, TokenLog } from '../types';
 import { getHintForError } from '../utils/errorHints';
 import { getAiHelpForError } from '../services/debugService';
-import { X, Trash2, Copy, Check, Info, Wand2, LoaderCircle, ChevronDown, UploadCloud } from 'lucide-react';
+import { X, Trash2, Copy, Check, Info, Wand2, LoaderCircle, ChevronDown } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useDraggableSheet } from '../hooks/useDraggableSheet';
 import { useDebug } from '../contexts/DebugContext';
-import { addWords, clearWords, getAllWords } from '../services/dbService';
 import StoragePanel from './StoragePanel';
+import WordManagementPanel from './WordManagementPanel';
 
 const LogEntryItem: React.FC<{ log: ConsoleLogEntry }> = ({ log }) => {
     const [isCopied, setIsCopied] = useState(false);
@@ -160,134 +159,16 @@ const TokenLogPanel: React.FC<{ logs: TokenLog[] }> = ({ logs }) => {
     );
 };
 
-const WordManagementPanel: React.FC = () => {
-    const [status, setStatus] = useState('');
-    const [wordCount, setWordCount] = useState<number | null>(null);
-
-    const updateWordCount = useCallback(() => {
-        getAllWords().then(words => {
-            setWordCount(words.length);
-        }).catch(() => setWordCount(0));
-    }, []);
-    
-    useEffect(() => {
-        updateWordCount();
-    }, [updateWordCount]);
-
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) {
-            setStatus('No file selected.');
-            return;
-        }
-        
-        setStatus(`Reading ${file.name}...`);
-        const reader = new FileReader();
-
-        reader.onload = async (e) => {
-            const content = e.target?.result as string;
-            if (!content) {
-                setStatus('File is empty.');
-                return;
-            }
-
-            try {
-                let words: string[] = [];
-                if (file.name.endsWith('.json')) {
-                    const data = JSON.parse(content);
-                    if (Array.isArray(data)) {
-                        words = data.filter(item => typeof item === 'string');
-                    } else if (typeof data === 'object' && data !== null) {
-                        words = Object.keys(data);
-                    } else {
-                        throw new Error('Unsupported JSON format. Must be an array of strings or an object with words as keys.');
-                    }
-                } else if (file.name.endsWith('.txt')) {
-                    words = content.split(/\r?\n/).map(w => w.trim()).filter(Boolean);
-                } else {
-                    throw new Error('Unsupported file type. Please use .json or .txt');
-                }
-
-                if (words.length > 0) {
-                    setStatus(`Found ${words.length} words. Storing in database...`);
-                    await addWords(words);
-                    setStatus(`Successfully stored ${words.length} words. Please reload the application to use the new word list.`);
-                    updateWordCount();
-                } else {
-                    setStatus('No words found in the file.');
-                }
-            } catch (error: any) {
-                setStatus(`Error: ${error.message}`);
-                console.error("Word import error:", error);
-            }
-        };
-
-        reader.onerror = () => {
-            setStatus('Failed to read file.');
-        };
-
-        reader.readAsText(file);
-    };
-    
-    const handleClear = async () => {
-        try {
-            setStatus('Clearing custom words...');
-            await clearWords();
-            setStatus('Custom words cleared. Please reload the application to use the default word list.');
-            updateWordCount();
-        } catch (error: any) {
-             setStatus(`Error clearing words: ${error.message}`);
-        }
-    };
-
-    return (
-        <div className="p-4 text-sm text-neutral-700 dark:text-gray-300">
-            <h3 className="font-bold text-lg mb-2">Custom Word List Management</h3>
-            <p className="mb-4 text-xs text-neutral-500 dark:text-gray-400">
-                Upload a custom word list from a .txt or .json file for autocomplete suggestions. This will override the default list.
-            </p>
-            
-             <div className="mb-4 p-3 bg-neutral-100 dark:bg-gray-800/50 rounded-lg border border-neutral-200 dark:border-gray-700/50">
-                <p className="font-semibold">Current Status:</p>
-                {wordCount === null ? (
-                    <p>Loading...</p>
-                ) : wordCount > 0 ? (
-                    <p>{wordCount.toLocaleString()} custom words loaded from IndexedDB.</p>
-                ) : (
-                    <p>Using default word list. No custom words loaded.</p>
-                )}
-            </div>
-
-            <div className="mb-4">
-                 <label htmlFor="word-file-upload" className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-700 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors">
-                    <UploadCloud className="h-5 w-5" />
-                    <span className="font-semibold">Upload Word File (.txt or .json)</span>
-                </label>
-                <input id="word-file-upload" type="file" accept=".txt,.json" onChange={handleFileChange} className="hidden" />
-            </div>
-            
-            {status && <div className="mb-4 p-2 bg-neutral-100 dark:bg-gray-900 rounded text-xs font-mono">{status}</div>}
-
-            <button
-                onClick={handleClear}
-                disabled={wordCount === 0 || wordCount === null}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-                <Trash2 className="h-4 w-4"/> Clear Custom Word List
-            </button>
-        </div>
-    );
-};
-
 interface DevConsoleProps {
     isOpen: boolean;
     onClose: () => void;
     mode: ConsoleMode;
     logs: ConsoleLogEntry[];
     clearLogs: () => void;
+    onNavigateToAnalysis: () => void;
 }
 
-const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose, mode, logs, clearLogs }) => {
+const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose, mode, logs, clearLogs, onNavigateToAnalysis }) => {
     const { tokenLogs } = useDebug();
     const [filter, setFilter] = useState<'all' | 'error' | 'warn' | 'tokens' | 'words' | 'storage'>('all');
     const consoleBodyRef = useRef<HTMLDivElement>(null);
@@ -297,34 +178,30 @@ const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose, mode, logs, cl
     const errorCount = useMemo(() => logs.filter(l => l.level === 'error').length, [logs]);
     const warningCount = useMemo(() => logs.filter(l => l.level === 'warn').length, [logs]);
     
+    // Fix: Define the filteredLogs variable to correctly filter logs based on the selected tab.
     const filteredLogs = useMemo(() => {
-        if (filter === 'error') return logs.filter(l => l.level === 'error');
-        if (filter === 'warn') return logs.filter(l => l.level === 'warn');
-        return logs;
+        if (filter === 'all') {
+            return logs;
+        }
+        // The filter state can be 'error' or 'warn', which directly maps to log levels.
+        return logs.filter(log => log.level === filter);
     }, [logs, filter]);
 
-    useEffect(() => {
-        if (consoleBodyRef.current) {
-            consoleBodyRef.current.scrollTop = consoleBodyRef.current.scrollHeight;
-        }
-    }, [filteredLogs, tokenLogs]);
-
-    useEffect(() => {
-        if (!isOpen) {
-            setFilter('all');
-        }
-    }, [isOpen]);
-    
     const TABS: { id: typeof filter; label: string }[] = [
         { id: 'all', label: 'All' },
-        { id: 'storage', label: 'Storage' },
+        { id: 'warn', label: 'Warnings' },
+        { id: 'error', label: 'Errors' },
         { id: 'tokens', label: 'Tokens' },
         { id: 'words', label: 'Words' },
-        { id: 'error', label: 'Errors' },
-        { id: 'warn', label: 'Warnings' },
+        { id: 'storage', label: 'Storage' },
     ];
     
     const counts = { all: logs.length, error: errorCount, warn: warningCount, tokens: tokenLogs.length, words: '', storage: '' };
+
+    const handleNavigate = () => {
+        onNavigateToAnalysis();
+        onClose();
+    };
 
     return (
         <div className={`fixed inset-0 bg-black/50 z-40 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose} aria-hidden="true">
@@ -370,13 +247,13 @@ const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose, mode, logs, cl
                 </div>
                 <div ref={consoleBodyRef} className="flex-1 overflow-y-auto">
                    {filter === 'storage' ? (
-                       <StoragePanel />
+                       <StoragePanel excludeStores={['words']} />
                    ) : filter === 'tokens' ? (
                        <TokenLogPanel logs={tokenLogs} />
                    ) : filter === 'words' ? (
-                       <WordManagementPanel />
+                       <WordManagementPanel onNavigateToAnalysis={handleNavigate} />
                    ) : filteredLogs.length === 0 ? (
-                        <div className="flex items-center justify-center h-full text-neutral-400 dark:text-gray-500 p-4 text-center">
+                        <div className="flex items-center justify-center h-full text-neutral-400 dark:text-gray-400 p-4 text-center">
                             {filter === 'all' ? 'No logs yet.' : `No ${filter}s logged.`}
                         </div>
                     ) : (

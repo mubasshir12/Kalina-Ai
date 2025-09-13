@@ -316,8 +316,8 @@ export const useChatHandler = ({
             }
 
             if (plan.isMoleculeRequest) {
-                const moleculeName = plan.moleculeName || fullPrompt;
-                updateConversationMessages(currentConversationId, prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, isPlanning: false, isMoleculeRequest: true } : m));
+                const moleculeName = plan.correctedMoleculeName || fullPrompt;
+                updateConversationMessages(currentConversationId, prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, isPlanning: false, isMoleculeRequest: true, moleculeNameForAnimation: moleculeName } : m));
                 
                 try {
                     const moleculeData = await getMoleculeData(moleculeName);
