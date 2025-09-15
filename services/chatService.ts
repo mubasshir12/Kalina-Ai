@@ -1,4 +1,5 @@
 
+
 import { Chat, Content } from "@google/genai";
 import { LTM, CodeSnippet, UserProfile, ConvoSummary } from "../types";
 import { getAiClient } from "./aiClient";
@@ -126,4 +127,33 @@ export const startChatSession = (
     history: history,
   });
   return chat;
+};
+
+const enhancePromptSystemInstruction = `You are an expert at refining user prompts. Your goal is to rewrite the user's query into a single, cohesive, and more detailed paragraph. The refined prompt should be clearer and provide more context for the AI to generate a high-quality response.
+
+**CRITICAL RULES:**
+1.  **Single Paragraph Only:** Your entire output MUST be a single paragraph. Do NOT use markdown, headings, bullet points, lists, or any special formatting.
+2.  **Natural Language:** The output must be a natural, conversational prompt that a user would send. It should not be a set of instructions for the AI.
+3.  **Direct Output:** Respond ONLY with the refined prompt text. Do NOT include any explanations, greetings, or conversational text like "Here is the refined prompt:".`;
+
+export const enhancePrompt = async (prompt: string): Promise<string> => {
+    if (!prompt.trim()) {
+        return prompt;
+    }
+    const ai = getAiClient();
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: `Refine this user prompt: "${prompt}"`,
+            config: {
+                systemInstruction: enhancePromptSystemInstruction,
+                thinkingConfig: { thinkingBudget: 0 } // Fast response needed
+            }
+        });
+        return response.text.trim();
+    } catch (error) {
+        console.error("Error enhancing prompt:", error);
+        // Fallback to original prompt on error
+        return prompt;
+    }
 };

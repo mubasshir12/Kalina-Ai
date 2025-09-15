@@ -1,9 +1,17 @@
 import { getAiClient } from "./aiClient";
 
+export interface AiHelpResult {
+    helpText: string;
+    usage: {
+        inputTokens: number;
+        outputTokens: number;
+    };
+}
+
 export const getAiHelpForError = async (
     error: { message: string, stack?: string },
     language: 'English' | 'Hinglish'
-): Promise<string> => {
+): Promise<AiHelpResult> => {
     const ai = getAiClient();
 
     const languageInstruction = language === 'Hinglish'
@@ -39,9 +47,18 @@ Provide an explanation and a possible solution.`;
                 thinkingConfig: { thinkingBudget: 0 }
             }
         });
-        return response.text.trim();
+        
+        const usage = {
+            inputTokens: response.usageMetadata?.promptTokenCount || 0,
+            outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
+        };
+        
+        return { helpText: response.text.trim(), usage };
     } catch (apiError) {
         console.error("AI help service failed:", apiError);
-        return "Sorry, I couldn't analyze this error. My own help service seems to be down.";
+        return {
+            helpText: "Sorry, I couldn't analyze this error. My own help service seems to be down.",
+            usage: { inputTokens: 0, outputTokens: 0 }
+        };
     }
 };

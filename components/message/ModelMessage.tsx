@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChatMessage as ChatMessageType, MoleculeData } from '../../types';
+import { ChatMessage as ChatMessageType, MoleculeData, OrbitalData } from '../../types';
 import MessageContent from './MessageContent';
 import MessageToolbar from './MessageToolbar';
 import MessageMetadata from './MessageMetadata';
@@ -14,6 +14,8 @@ interface ModelMessageProps extends ChatMessageType {
     setCodeForPreview: (data: { code: string; language: string; } | null) => void;
     isSelectionMode?: boolean;
     onMaximizeMoleculeViewer: (molecule: MoleculeData) => void;
+    onMaximizeOrbitalViewer: (orbital: OrbitalData) => void;
+    onViewSources?: () => void;
 }
 
 const ModelMessage: React.FC<ModelMessageProps> = (props) => {

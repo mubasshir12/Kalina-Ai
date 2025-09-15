@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ConsoleLogEntry, ConsoleMode, TokenLog } from '../types';
 import { getHintForError } from '../utils/errorHints';
-import { getAiHelpForError } from '../services/debugService';
+import { getAiHelpForError, AiHelpResult } from '../services/debugService';
 import { X, Trash2, Copy, Check, Info, Wand2, LoaderCircle, ChevronDown } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useDraggableSheet } from '../hooks/useDraggableSheet';
@@ -10,6 +10,7 @@ import StoragePanel from './StoragePanel';
 import WordManagementPanel from './WordManagementPanel';
 
 const LogEntryItem: React.FC<{ log: ConsoleLogEntry }> = ({ log }) => {
+    const { addTokenLog } = useDebug();
     const [isCopied, setIsCopied] = useState(false);
     const [aiHelp, setAiHelp] = useState<string>('');
     const [isGettingHelp, setIsGettingHelp] = useState(false);
@@ -28,8 +29,18 @@ const LogEntryItem: React.FC<{ log: ConsoleLogEntry }> = ({ log }) => {
         setShowLangPrompt(false);
         setIsGettingHelp(true);
         setIsAiHelpVisible(true);
-        const helpText = await getAiHelpForError({ message: log.message, stack: log.stack }, language);
+        const { helpText, usage } = await getAiHelpForError({ message: log.message, stack: log.stack }, language);
         setAiHelp(helpText);
+        
+        if (usage.inputTokens > 0 || usage.outputTokens > 0) {
+            addTokenLog({
+                source: 'AI Debugger',
+                inputTokens: usage.inputTokens,
+                outputTokens: usage.outputTokens,
+                details: language
+            });
+        }
+
         setIsGettingHelp(false);
     };
 

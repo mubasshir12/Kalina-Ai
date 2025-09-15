@@ -1,10 +1,13 @@
+
 import React from 'react';
 
 export type ChatModel = 'gemini-2.5-flash' | 'gemini-2.5-pro' | 'gemini-2.5-flash-lite' | 'gemini-2.0-flash' | 'gemini-2.0-flash-lite';
-export type Tool = 'smart' | 'webSearch' | 'thinking' | 'translator' | 'urlReader' | 'chemistry';
-export type View = 'chat' | 'memory' | 'translator' | 'usage' | 'usage-detail' | 'convo-detail' | 'editor' | 'image-editor' | 'storage' | 'molecule-viewer' | 'word-analysis';
+export type Tool = 'smart' | 'webSearch' | 'thinking' | 'translator' | 'urlReader' | 'chemistry' | 'multi-agent';
+export type View = 'chat' | 'memory' | 'translator' | 'usage' | 'usage-detail' | 'convo-detail' | 'editor' | 'image-editor' | 'storage' | 'molecule-viewer' | 'orbital-viewer' | 'word-analysis';
 
 export type MessageRole = 'user' | 'model';
+
+export type AgentName = 'researcher' | 'fact-checker' | 'advocate' | 'critic' | 'executer' | 'finalizer';
 
 export interface ModelInfo {
   id: ChatModel;
@@ -19,6 +22,7 @@ export interface Web {
 
 export interface GroundingChunk {
   web: Web;
+  agent?: AgentName;
 }
 
 export interface ThoughtStep {
@@ -52,6 +56,19 @@ export interface Location {
     details?: string;
 }
 
+export interface OrbitalData {
+    // e.g., '2p_x', '3d_xy'
+    name: string;
+}
+
+export interface AgentProcess {
+    agent: AgentName;
+    duration: number;
+    usedWebSearch?: boolean;
+    inputTokens?: number;
+    outputTokens?: number;
+}
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;
@@ -77,7 +94,7 @@ export interface ChatMessage {
   isAnalyzingFile?: boolean;
   analysisCompleted?: boolean;
   isPlanning?: boolean;
-  toolInUse?: 'url';
+  toolInUse?: 'url' | 'multi-agent';
   isLongToolUse?: boolean;
   memoryUpdated?: boolean;
   inputTokens?: number; // User prompt tokens
@@ -87,6 +104,12 @@ export interface ChatMessage {
   isMoleculeRequest?: boolean;
   molecule?: MoleculeData;
   moleculeNameForAnimation?: string;
+  isOrbitalRequest?: boolean;
+  orbital?: OrbitalData;
+  agentProcess?: AgentProcess[];
+  isMultiAgent?: boolean;
+  activeAgent?: AgentName;
+  activeAgentStatusMessage?: string;
 }
 
 export interface AppError {
@@ -161,7 +184,8 @@ export interface ConsoleLogEntry {
 export interface TokenLog {
     id: string;
     timestamp: string;
-    source: 'Chat' | 'Memory/Suggestions' | 'Translator' | 'Planner' | 'Code Analyzer' | 'Convo Summarizer';
+    // FIX: Add 'AI Debugger' to the source type to allow logging tokens from the AI help feature.
+    source: 'Chat' | 'Memory/Suggestions' | 'Translator' | 'Planner' | 'Code Analyzer' | 'Convo Summarizer' | 'AI Debugger' | 'Multi-Agent';
     inputTokens: number;
     outputTokens: number;
     totalTokens: number;

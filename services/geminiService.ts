@@ -23,13 +23,16 @@ Set to true if the user asks what you can do, about your tools, or your abilitie
 **5. Molecule Visualization (isMoleculeRequest: true):**
 Set to true if the user asks to see a 3D model or structure of a chemical compound (e.g., "show me water in 3D", "what does caffeine look like?"). You MUST analyze the user's input, correct any spelling mistakes, and find the canonical name of the compound. Extract the corrected name into \`correctedMoleculeName\`.
 
-**6. File Analysis:**
+**6. Atomic Orbital Visualization (isOrbitalRequest: true):**
+Set to true if the user asks to see or visualize an atomic orbital (e.g., "show me a p orbital", "what does a 3d orbital look like?"). Extract the specific orbital requested (e.g., 'p orbital', '3d orbital', 'dz2 orbital') into \`orbitalName\`.
+
+**7. File Analysis:**
 - If a file is attached, always set 'needsThinking' to true.
 
-**7. Complex Prompts (needsThinking: true):**
+**8. Complex Prompts (needsThinking: true):**
 Set to true for prompts requiring analysis, creativity, multi-step reasoning, coding, or file analysis.
 
-**8. Simple Prompts (needsThinking: false):**
+**9. Simple Prompts (needsThinking: false):**
 Set to false for basic conversational turns.
 
 **Output:**
@@ -42,6 +45,8 @@ Respond ONLY with a valid JSON object based on the prompt analysis.
 - \`isCapabilitiesRequest\` (boolean): User is asking about your abilities.
 - \`isMoleculeRequest\` (boolean): User is asking for a 3D model of a molecule.
 - \`correctedMoleculeName\` (string, optional): The corrected, canonical name of the molecule if \`isMoleculeRequest\` is true.
+- \`isOrbitalRequest\` (boolean): User is asking for a 3D model of an atomic orbital.
+- \`orbitalName\` (string, optional): The name of the orbital if \`isOrbitalRequest\` is true.
 - \`needsThinking\` (boolean): Complex task.
 - \`needsCodeContext\` (boolean): Prompt relates to previous code.
 - \`thoughts\` (array, optional): If 'needsThinking' is true, provide a step-by-step plan.
@@ -64,6 +69,8 @@ export interface ResponsePlan {
     needsCodeContext: boolean;
     isMoleculeRequest: boolean;
     correctedMoleculeName?: string;
+    isOrbitalRequest: boolean;
+    orbitalName?: string;
     thoughts: ThoughtStep[];
     searchPlan?: ThoughtStep[];
 }
@@ -112,6 +119,8 @@ export const planResponse = async (prompt: string, images?: { base64: string; mi
                         isCapabilitiesRequest: { type: Type.BOOLEAN },
                         isMoleculeRequest: { type: Type.BOOLEAN },
                         correctedMoleculeName: { type: Type.STRING },
+                        isOrbitalRequest: { type: Type.BOOLEAN },
+                        orbitalName: { type: Type.STRING },
                         needsThinking: { type: Type.BOOLEAN },
                         needsCodeContext: { type: Type.BOOLEAN },
                         thoughts: {
@@ -139,7 +148,7 @@ export const planResponse = async (prompt: string, images?: { base64: string; mi
                             }
                         }
                     },
-                    required: ["needsWebSearch", "isUrlReadRequest", "isCreatorRequest", "isCapabilitiesRequest", "needsThinking", "needsCodeContext", "isMoleculeRequest"],
+                    required: ["needsWebSearch", "isUrlReadRequest", "isCreatorRequest", "isCapabilitiesRequest", "needsThinking", "needsCodeContext", "isMoleculeRequest", "isOrbitalRequest"],
                 }
             }
         });
@@ -147,7 +156,7 @@ export const planResponse = async (prompt: string, images?: { base64: string; mi
         const result = JSON.parse(jsonText);
 
         // If a tool-based request is made, disable general thinking to go straight to the task.
-        if (result.needsWebSearch || result.isUrlReadRequest || result.isMoleculeRequest) {
+        if (result.needsWebSearch || result.isUrlReadRequest || result.isMoleculeRequest || result.isOrbitalRequest) {
             result.needsThinking = false;
             result.thoughts = [];
         }
@@ -173,6 +182,8 @@ export const planResponse = async (prompt: string, images?: { base64: string; mi
             needsCodeContext: false, // <-- Changed from true to false for token efficiency on error
             isMoleculeRequest: false,
             correctedMoleculeName: undefined,
+            isOrbitalRequest: false,
+            orbitalName: undefined,
             thoughts: [], // No thoughts when thinking is disabled
             searchPlan: []
         };

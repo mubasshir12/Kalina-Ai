@@ -1,9 +1,13 @@
+
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { Lightbulb, BarChart3, Code2, BugPlay, DatabaseZap, HelpCircle, Mail, BookOpenText, GitCompareArrows, ChefHat, Share2, Presentation, Sparkles, FlaskConical } from 'lucide-react';
-import { Suggestion } from '../types';
+import { Lightbulb, BarChart3, Code2, BugPlay, DatabaseZap, HelpCircle, Mail, BookOpenText, GitCompareArrows, ChefHat, Share2, Presentation, Sparkles, FlaskConical, Atom } from 'lucide-react';
+import { Suggestion, Tool } from '../types';
 
 interface WelcomeScreenProps {
   onSelectSuggestion: (suggestion: Suggestion) => void;
+  onTryMultiAgent: () => void;
+  ctaRef: React.Ref<HTMLButtonElement>;
 }
 
 const allSuggestions: Suggestion[] = [
@@ -52,6 +56,11 @@ const allSuggestions: Suggestion[] = [
         icon: <BookOpenText className="h-5 w-5 text-indigo-500" />,
         prompt: "Summarize the key events of World War II in three paragraphs."
     },
+     { 
+        text: "Use AI Agents", 
+        icon: <Sparkles className="h-5 w-5 text-cyan-500" />,
+        prompt: "Do a market analysis on the future of electric vehicles using the full multi-agent team."
+    },
     {
         text: "Compare and contrast",
         icon: <GitCompareArrows className="h-5 w-5 text-green-500" />,
@@ -61,6 +70,11 @@ const allSuggestions: Suggestion[] = [
         text: "Visualize caffeine", 
         icon: <FlaskConical className="h-5 w-5 text-emerald-500" />,
         prompt: "Show me the 3D structure of caffeine"
+    },
+    { 
+        text: "Visualize a p-orbital", 
+        icon: <Atom className="h-5 w-5 text-blue-500" />,
+        prompt: "Show me what a p orbital looks like"
     },
     { 
         text: "Explain covalent bonds", 
@@ -94,6 +108,11 @@ const allSuggestions: Suggestion[] = [
     }
 ];
 
+const typingPhrases = [
+    "Unlock deep insights.",
+    "Deploy a team of AI agents.",
+    "Solve complex problems."
+];
 
 const MarqueeRow: React.FC<{
     suggestions: Suggestion[];
@@ -130,9 +149,14 @@ const MarqueeRow: React.FC<{
 };
 
 
-const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSelectSuggestion }) => {
+const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSelectSuggestion, onTryMultiAgent, ctaRef }) => {
     const [firstRow, setFirstRow] = useState<Suggestion[]>([]);
     const [secondRow, setSecondRow] = useState<Suggestion[]>([]);
+    
+    const [phraseIndex, setPhraseIndex] = useState(0);
+    const [subIndex, setSubIndex] = useState(0);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [currentText, setCurrentText] = useState('');
 
     const refreshSuggestions = useCallback(() => {
         const shuffled = [...allSuggestions].sort(() => 0.5 - Math.random());
@@ -144,6 +168,39 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSelectSuggestion }) => 
     useEffect(() => {
         refreshSuggestions();
     }, [refreshSuggestions]);
+    
+    useEffect(() => {
+        const typeSpeed = 100;
+        const deleteSpeed = 50;
+        const pauseDuration = 2000;
+
+        let timeoutId: number;
+
+        const handleTyping = () => {
+            const currentPhrase = typingPhrases[phraseIndex];
+            if (isDeleting) {
+                if (subIndex > 0) {
+                    setCurrentText(currentPhrase.substring(0, subIndex - 1));
+                    setSubIndex(subIndex - 1);
+                } else {
+                    setIsDeleting(false);
+                    setPhraseIndex((prevIndex) => (prevIndex + 1) % typingPhrases.length);
+                }
+            } else {
+                if (subIndex < currentPhrase.length) {
+                    setCurrentText(currentPhrase.substring(0, subIndex + 1));
+                    setSubIndex(subIndex + 1);
+                } else {
+                    timeoutId = window.setTimeout(() => setIsDeleting(true), pauseDuration);
+                }
+            }
+        };
+
+        const delay = isDeleting ? deleteSpeed : (subIndex === typingPhrases[phraseIndex].length ? pauseDuration : typeSpeed);
+        timeoutId = window.setTimeout(handleTyping, delay);
+
+        return () => clearTimeout(timeoutId);
+    }, [subIndex, isDeleting, phraseIndex]);
 
   return (
     <div className="relative flex flex-col items-center justify-center h-full text-center overflow-hidden">
@@ -169,13 +226,56 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSelectSuggestion }) => 
                 from { transform: translateX(0); }
                 to { transform: translateX(-50%); }
             }
+            .typing-cursor {
+                display: inline-block;
+                width: 3px;
+                height: 2.2rem;
+                background-color: #f59e0b;
+                margin-left: 4px;
+                animation: blink 1s infinite;
+                vertical-align: middle;
+            }
+            .dark .typing-cursor {
+                background-color: #fbbf24;
+            }
+            @keyframes blink {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0; }
+            }
+            .cta-button-glow {
+                animation: pulse-glow 3s ease-in-out infinite;
+            }
+            @keyframes pulse-glow {
+                0%, 100% {
+                    transform: scale(1);
+                    box-shadow: 0 0 10px rgba(245, 158, 11, 0.2), 0 0 20px rgba(245, 158, 11, 0.1);
+                }
+                50% {
+                    transform: scale(1.03);
+                    box-shadow: 0 0 20px rgba(245, 158, 11, 0.4), 0 0 40px rgba(245, 158, 11, 0.2);
+                }
+            }
         `}</style>
-      <div className="relative z-10 w-full">
-          <div className="mb-12">
-            <h1 className="text-4xl md:text-5xl font-serif font-bold bg-gradient-to-br from-amber-600 to-orange-600 dark:from-amber-400 dark:to-orange-500 bg-clip-text text-transparent select-none">
+      <div className="relative z-10 w-full flex flex-col items-center">
+            <h1 className="text-4xl md:text-5xl font-serif font-bold text-neutral-800 dark:text-white select-none mb-4">
                 What can I help with?
             </h1>
-          </div>
+            
+            <div className="h-10 text-center mb-4">
+                <span className="text-2xl font-semibold bg-gradient-to-br from-indigo-500 to-purple-600 dark:from-indigo-400 dark:to-purple-500 bg-clip-text text-transparent">
+                    {currentText}
+                </span>
+                <span className="typing-cursor"></span>
+            </div>
+
+            <button 
+                ref={ctaRef}
+                onClick={onTryMultiAgent}
+                className="cta-button-glow mb-8 inline-flex items-center gap-3 px-6 py-3 font-semibold text-white bg-gradient-to-br from-amber-500 to-orange-600 rounded-full shadow-lg hover:from-amber-600 hover:to-orange-700 transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-amber-500/50"
+            >
+                Try Multi-Agent Mode
+            </button>
+          
           <div className="flex flex-col justify-center items-center gap-3 w-full">
                 <MarqueeRow suggestions={firstRow} onSelectSuggestion={onSelectSuggestion} direction="left" />
                 <MarqueeRow suggestions={secondRow} onSelectSuggestion={onSelectSuggestion} direction="right" />

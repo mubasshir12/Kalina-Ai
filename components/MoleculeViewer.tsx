@@ -169,6 +169,7 @@ const MoleculeViewer: React.FC<MoleculeViewerProps> = ({ molecule, onMaximize, i
     const [showOrbitals, setShowOrbitals] = useState(false);
     const [style, setStyle] = useState<MoleculeStyle>('ballAndStick');
     const [showHydrogens, setShowHydrogens] = useState(true);
+    const [showLabels, setShowLabels] = useState(true);
     const [autoRotate, setAutoRotate] = useState(false);
     const [isControlsOpen, setIsControlsOpen] = useState(true);
     
@@ -260,7 +261,7 @@ const MoleculeViewer: React.FC<MoleculeViewerProps> = ({ molecule, onMaximize, i
         }
         
         // Labels (always show except for space-filling, or if electrons are on)
-        if (style !== 'spaceFilling' || showElectrons) {
+        if (showLabels && (style !== 'spaceFilling' || showElectrons)) {
              filteredMolecule.atoms.forEach((atom, index) => {
                 const radius = atomRadii[atom.element.toUpperCase()] || atomRadii.DEFAULT;
                 const colorHex = atomColors[atom.element.toUpperCase()] || atomColors.DEFAULT;
@@ -495,7 +496,7 @@ const MoleculeViewer: React.FC<MoleculeViewerProps> = ({ molecule, onMaximize, i
             });
             if (currentMount) { while(currentMount.firstChild) currentMount.removeChild(currentMount.firstChild); }
         };
-    }, [filteredMolecule, showElectrons, showElectronCloud, style, showOrbitals]);
+    }, [filteredMolecule, showElectrons, showElectronCloud, style, showOrbitals, showLabels]);
 
     if (isFullScreen) {
         return (
@@ -559,6 +560,7 @@ const MoleculeViewer: React.FC<MoleculeViewerProps> = ({ molecule, onMaximize, i
                                     <p className="text-xs font-semibold mb-2 text-neutral-600 dark:text-gray-300">Options</p>
                                     <div className="flex flex-wrap gap-x-4 gap-y-2">
                                         <CustomCheckbox id="opt-h-fs" label="Show Hydrogens" checked={showHydrogens} onChange={e => setShowHydrogens(e.target.checked)} isOverlay />
+                                        <CustomCheckbox id="opt-labels-fs" label="Show Labels" checked={showLabels} onChange={e => setShowLabels(e.target.checked)} isOverlay />
                                         <CustomCheckbox id="opt-rot-fs" label="Auto-rotate" checked={autoRotate} onChange={e => setAutoRotate(e.target.checked)} isOverlay />
                                         <CustomCheckbox id="opt-orb-fs" label="Show Orbitals" checked={showOrbitals} onChange={e => setShowOrbitals(e.target.checked)} isOverlay />
                                         <CustomCheckbox id="opt-cloud-fs" label="Show Electron Cloud" checked={showElectronCloud} onChange={e => setShowElectronCloud(e.target.checked)} isOverlay />
@@ -629,6 +631,7 @@ const MoleculeViewer: React.FC<MoleculeViewerProps> = ({ molecule, onMaximize, i
                         <p className="text-xs font-semibold mb-2 text-neutral-500 dark:text-gray-400">Options</p>
                         <div className="flex flex-wrap gap-x-4 gap-y-2">
                            <CustomCheckbox id="opt-h" label="Show Hydrogens" checked={showHydrogens} onChange={e => setShowHydrogens(e.target.checked)} />
+                           <CustomCheckbox id="opt-labels" label="Show Labels" checked={showLabels} onChange={e => setShowLabels(e.target.checked)} />
                            <CustomCheckbox id="opt-rot" label="Auto-rotate" checked={autoRotate} onChange={e => setAutoRotate(e.target.checked)} />
                            <CustomCheckbox id="opt-orb" label="Show Orbitals" checked={showOrbitals} onChange={e => setShowOrbitals(e.target.checked)} />
                            <CustomCheckbox id="opt-cloud" label="Show Electron Cloud" checked={showElectronCloud} onChange={e => setShowElectronCloud(e.target.checked)} />

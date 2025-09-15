@@ -1,6 +1,7 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Content, Part } from '@google/genai';
-import { ChatMessage as ChatMessageType, Suggestion, ChatModel, LTM, CodeSnippet, GroundingChunk, UserProfile, Tool, Conversation } from '../types';
+import { ChatMessage as ChatMessageType, Suggestion, ChatModel, LTM, CodeSnippet, GroundingChunk, UserProfile, Tool, Conversation, AgentName, AgentProcess } from '../types';
 import { getAiClient } from '../services/aiClient';
 import { startChatSession, buildSystemInstruction } from '../services/chatService';
 import { planResponse } from '../services/geminiService';
@@ -14,6 +15,7 @@ import { developerProfile } from '../services/developerProfile';
 import { getPersonaContext } from '../services/personaService';
 import { getCapabilitiesContext } from '../services/capabilitiesService';
 import { initializeSummarizer, queueSummarizationTasks } from '../services/summarizationService';
+import { runAgentWorkflow } from '../services/multiAgentService';
 
 const models = [
     { id: 'gemini-2.5-flash', name: 'Kalina 2.5 Flash' },
@@ -69,6 +71,24 @@ export const useChatHandler = ({
     setUserProfile,
     setActiveSuggestion,
     setSuggestions
+}: {
+    apiKey: string | null;
+    conversations: Conversation[];
+    activeConversationId: string | null;
+    ltm: LTM;
+    codeMemory: CodeSnippet[];
+    userProfile: UserProfile;
+    selectedTool: Tool;
+    selectedChatModel: ChatModel;
+    updateConversation: (conversationId: string, updater: (convo: Conversation) => Conversation) => void;
+    updateConversationMessages: (conversationId: string, updater: (messages: ChatMessageType[]) => ChatMessageType[]) => void;
+    setConversations: React.Dispatch<React.SetStateAction<Conversation[]>>;
+    setActiveConversationId: React.Dispatch<React.SetStateAction<string | null>>;
+    setLtm: React.Dispatch<React.SetStateAction<LTM>>;
+    setCodeMemory: React.Dispatch<React.SetStateAction<CodeSnippet[]>>;
+    setUserProfile: React.Dispatch<React.SetStateAction<UserProfile>>;
+    setActiveSuggestion: React.Dispatch<React.SetStateAction<Suggestion | null>>;
+    setSuggestions: React.Dispatch<React.SetStateAction<string[]>>;
 }) => {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [isThinking, setIsThinking] = useState<boolean>(false);
@@ -207,14 +227,98 @@ export const useChatHandler = ({
             setElapsedTime(elapsed);
         }, 53);
 
-        const planningMessage: ChatMessageType = { id: crypto.randomUUID(), role: 'model', content: '', isPlanning: true, modelUsed: modelToUse, timestamp: new Date().toISOString() };
-        
         if (!isRetry) {
             const newUserMessage: ChatMessageType = { id: crypto.randomUUID(), role: 'user', content: fullPrompt, images: images, file: file, url: url, modelUsed: modelToUse, timestamp: new Date().toISOString() };
-            updateConversationMessages(currentConversationId, prev => [...prev, newUserMessage, planningMessage]);
-        } else {
-            updateConversationMessages(currentConversationId, prev => [...prev, planningMessage]);
+            updateConversationMessages(currentConversationId, prev => [...prev, newUserMessage]);
         }
+
+        // --- Multi-Agent Workflow ---
+        if (selectedTool === 'multi-agent') {
+            const allAgents = new Set<AgentName>(['researcher', 'fact-checker', 'advocate', 'critic', 'executer', 'finalizer']);
+
+            const multiAgentMessage: ChatMessageType = {
+                id: crypto.randomUUID(), role: 'model', content: '', isMultiAgent: true, toolInUse: 'multi-agent', activeAgent: 'researcher', agentProcess: [], timestamp: new Date().toISOString(),
+            };
+            updateConversationMessages(currentConversationId, prev => [...prev, multiAgentMessage]);
+
+            let allSources: GroundingChunk[] = [];
+            const agentProcesses: AgentProcess[] = [];
+
+            await runAgentWorkflow(
+                fullPrompt, allAgents,
+                (progress) => { // onProgress
+                    if (isCancelledRef.current) return;
+                    
+                    if (progress.status === 'started') {
+                        updateConversationMessages(currentConversationId, prev => prev.map((m, i) => 
+                            i === prev.length - 1 
+                                ? { ...m, activeAgent: progress.agent, activeAgentStatusMessage: "Initializing..." } 
+                                : m
+                        ));
+                    } else if (progress.status === 'working' && progress.message) {
+                        updateConversationMessages(currentConversationId, prev => prev.map((m, i) => 
+                            i === prev.length - 1 
+                                ? { ...m, activeAgentStatusMessage: progress.message } 
+                                : m
+                        ));
+                    } else if (progress.status === 'finished' && progress.duration) {
+                        const { agent, duration, usedWebSearch, inputTokens, outputTokens } = progress as any;
+                        agentProcesses.push({ agent, duration, usedWebSearch, inputTokens, outputTokens });
+                        // Sort the processes to ensure they render in the correct pipeline order
+                        const sortedProcesses = agentProcesses.sort((a, b) => {
+                            const order: AgentName[] = ['researcher', 'fact-checker', 'advocate', 'critic', 'executer', 'finalizer'];
+                            return order.indexOf(a.agent) - order.indexOf(b.agent);
+                        });
+                        updateConversationMessages(currentConversationId, prev => prev.map((m, i) => 
+                            i === prev.length - 1 
+                                ? { ...m, agentProcess: sortedProcesses } 
+                                : m
+                        ));
+                    }
+                },
+                (chunk) => { // onStream
+                    if (isCancelledRef.current) return;
+                    updateConversationMessages(currentConversationId, prev => {
+                        const last = prev[prev.length - 1];
+                        return [...prev.slice(0, -1), { ...last, content: (last.content || '') + chunk }];
+                    });
+                },
+                (sources) => { // onSources
+                    if (isCancelledRef.current) return; allSources.push(...sources);
+                },
+                (finalResult) => { // onFinalResult
+                    if (isCancelledRef.current) return;
+                    const { promptTokenCount, candidatesTokenCount } = finalResult.usage;
+                    
+                    const finalizerProcess = agentProcesses.find(p => p.agent === 'finalizer');
+                    if (finalizerProcess) {
+                        finalizerProcess.inputTokens = promptTokenCount;
+                        finalizerProcess.outputTokens = candidatesTokenCount;
+                    }
+
+                    const totalInput = agentProcesses.reduce((sum, p) => sum + (p.inputTokens || 0), 0);
+                    const totalOutput = agentProcesses.reduce((sum, p) => sum + (p.outputTokens || 0), 0);
+
+                    addTokenLog({ source: 'Multi-Agent', inputTokens: totalInput, outputTokens: totalOutput, details: `${allAgents.size} agents` });
+                    
+                    updateConversationMessages(currentConversationId, prev => {
+                        const last = prev[prev.length - 1];
+                        return [...prev.slice(0, -1), {
+                            ...last, isMultiAgent: false, activeAgent: undefined, sources: allSources.length > 0 ? allSources : undefined, agentProcess: agentProcesses,
+                            inputTokens: totalInput, outputTokens: totalOutput, generationTime: Date.now() - responseStartTimeRef.current,
+                        }];
+                    });
+                    setIsLoading(false);
+                    stopResponseTimer();
+                    setActiveSuggestion(null);
+                }
+            );
+            return; // End execution for multi-agent
+        }
+
+        // --- Standard Workflow ---
+        const planningMessage: ChatMessageType = { id: crypto.randomUUID(), role: 'model', content: '', isPlanning: true, modelUsed: modelToUse, timestamp: new Date().toISOString() };
+        updateConversationMessages(currentConversationId, prev => [...prev, planningMessage]);
 
         let longToolUseTimer: ReturnType<typeof setTimeout> | null = null;
         let isImageAnalysisRequest = false;
@@ -345,6 +449,15 @@ export const useChatHandler = ({
                     stopResponseTimer();
                     return;
                 }
+            }
+
+            if (plan.isOrbitalRequest) {
+                const orbitalName = plan.orbitalName || 'orbital';
+                updateConversationMessages(currentConversationId, prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, isPlanning: false, isOrbitalRequest: true, orbital: { name: orbitalName } } : m));
+                
+                finalPromptForModel = `I have displayed the ${orbitalName}. Now, please provide a brief, helpful description of its key characteristics (shape, nodes, number of electrons).`;
+                isWebSearchEnabled = false;
+                isThinkingEnabled = false;
             }
 
 
@@ -485,7 +598,7 @@ export const useChatHandler = ({
                     const lastMessage = prevMessages[prevMessages.length - 1];
                     if (lastMessage?.role === 'model') {
                         const updatedMessages = [...prevMessages];
-                        updatedMessages[prevMessages.length - 1] = { ...lastMessage, content: displayContent, sources, isPlanning: false };
+                        updatedMessages[prevMessages.length - 1] = { ...lastMessage, content: displayContent, sources, isPlanning: false, isOrbitalRequest: false };
                         return updatedMessages;
                     }
                     // This case handles adding the very first model message chunk

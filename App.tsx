@@ -1,5 +1,7 @@
+
+
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Suggestion, Tool, ChatModel, ModelInfo, View, ConsoleMode, ChatMessage, MoleculeData } from './types';
+import { Suggestion, Tool, ChatModel, ModelInfo, View, ConsoleMode, ChatMessage, MoleculeData, OrbitalData, AgentName, GroundingChunk } from './types';
 import { initializeAiClient } from './services/aiClient';
 import Header from './components/Header';
 import ChatInput from './components/ChatInput';
@@ -19,9 +21,11 @@ import ParticleUniverse from './components/ParticleUniverse';
 import Globe from './components/Globe';
 import ImageModal from './components/ImageModal';
 import CodePreviewModal from './components/CodePreviewModal';
+import SourceViewer from './components/SourceViewer';
 import { useScrollSpy } from './hooks/useScrollSpy';
 import { Trash2 } from 'lucide-react';
 import { getSetting, saveSetting, getTranslatorUsage, saveTranslatorUsage, getAllWords } from './services/dbService';
+import ToolSelectionAnimation from './components/ToolSelectionAnimation';
 
 const models: ModelInfo[] = [
     { id: 'gemini-2.5-flash', name: 'Kalina 2.5 Flash', description: 'Optimized for speed and efficiency.' },
@@ -52,6 +56,8 @@ const App: React.FC = () => {
     const [codeForPreview, setCodeForPreview] = useState<{ code: string; language: string; } | null>(null);
     const [imageToEdit, setImageToEdit] = useState<{ index: number; base64: string; mimeType: string; } | null>(null);
     const [moleculeForFullScreen, setMoleculeForFullScreen] = useState<MoleculeData | null>(null);
+    const [orbitalForFullScreen, setOrbitalForFullScreen] = useState<OrbitalData | null>(null);
+    const [sourcesForViewer, setSourcesForViewer] = useState<GroundingChunk[] | null>(null);
     
     // State for chat input, lifted to manage from full-screen editor
     const [input, setInput] = useState('');
@@ -62,6 +68,11 @@ const App: React.FC = () => {
     // State for code-related keywords, now fetched dynamically
     const [codeKeywords, setCodeKeywords] = useState<string[]>([]);
     const [englishWords, setEnglishWords] = useState<string[]>([]);
+    
+    // State for Tool Selection Animation
+    const [animationProps, setAnimationProps] = useState<{ start: DOMRect; end: DOMRect } | null>(null);
+    const ctaButtonRef = useRef<HTMLButtonElement>(null);
+    const toolSelectorRef = useRef<HTMLDivElement>(null);
 
 
     // Dev Console State
@@ -521,11 +532,33 @@ const App: React.FC = () => {
         setCurrentView('molecule-viewer');
     };
 
+    const handleMaximizeOrbitalViewer = (orbital: OrbitalData) => {
+        setOrbitalForFullScreen(orbital);
+        setCurrentView('orbital-viewer');
+    };
+    
+    const handleViewSources = (sources: GroundingChunk[]) => {
+        setSourcesForViewer(sources);
+    };
+
+    const handleTryMultiAgent = () => {
+        const startRect = ctaButtonRef.current?.getBoundingClientRect();
+        const endRect = toolSelectorRef.current?.getBoundingClientRect();
+
+        if (startRect && endRect) {
+            setAnimationProps({ start: startRect, end: endRect });
+            handleToolChange('multi-agent');
+        } else {
+            // Fallback for safety if refs aren't ready
+            handleToolChange('multi-agent');
+        }
+    };
+
     const showConsoleToggleButton = consoleMode === 'manual' || (consoleMode === 'auto' && logs.length > 0);
 
     return (
         <>
-            <div className="relative flex flex-col h-[100dvh] bg-[#F9F6F2] dark:bg-transparent text-neutral-800 dark:text-white transition-colors duration-300 overflow-hidden">
+            <div className="relative flex flex-col h-screen bg-[#F9F6F2] dark:bg-transparent text-neutral-800 dark:text-white transition-colors duration-300 overflow-hidden">
                 <div className="absolute inset-0 z-0">
                     {isDarkMode ? <ParticleUniverse /> : <Globe />}
                 </div>
@@ -572,16 +605,20 @@ const App: React.FC = () => {
                     onViewUsageDetails={handleViewUsageDetails}
                     viewingConvo={viewingConvo}
                     onViewConvoDetails={handleViewConvoDetails}
+                    onTryMultiAgent={handleTryMultiAgent}
+                    ctaRef={ctaButtonRef}
                     onSaveEditor={handleSaveEditor}
                     editorInitialText={input}
                     onSaveEditedImage={handleSaveEditedImage}
                     imageToEdit={imageToEdit}
                     isSelectionMode={isSelectionMode}
                     selectedMessageIds={selectedMessageIds}
-                    // Fix: Corrected a typo. The prop expected the 'handleToggleMessageSelection' function, but a non-existent variable was passed.
                     onToggleMessageSelection={handleToggleMessageSelection}
                     moleculeForFullScreen={moleculeForFullScreen}
                     onMaximizeMoleculeViewer={handleMaximizeMoleculeViewer}
+                    orbitalForFullScreen={orbitalForFullScreen}
+                    onMaximizeOrbitalViewer={handleMaximizeOrbitalViewer}
+                    onViewSources={handleViewSources}
                 />
                 
                 <div className="relative">
@@ -631,6 +668,7 @@ const App: React.FC = () => {
                                     elapsedTime={elapsedTime}
                                     selectedTool={selectedTool}
                                     onToolChange={handleToolChange}
+                                    toolSelectorRef={toolSelectorRef}
                                     activeSuggestion={activeSuggestion}
                                     onClearSuggestion={() => setActiveSuggestion(null)}
                                     onCancelStream={handleRequestCancelStream}
@@ -681,6 +719,14 @@ const App: React.FC = () => {
                 )}
             </div>
             
+            {animationProps && (
+              <ToolSelectionAnimation
+                startRect={animationProps.start}
+                endRect={animationProps.end}
+                onComplete={() => setAnimationProps(null)}
+              />
+            )}
+
             <ModelSwitchModal
                 isOpen={isModelSwitchModalOpen}
                 onClose={() => {
@@ -736,6 +782,13 @@ const App: React.FC = () => {
                     code={codeForPreview.code}
                     language={codeForPreview.language}
                     onClose={() => setCodeForPreview(null)}
+                />
+            )}
+            
+            {sourcesForViewer && (
+                <SourceViewer 
+                    sources={sourcesForViewer}
+                    onClose={() => setSourcesForViewer(null)}
                 />
             )}
         </>
