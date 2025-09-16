@@ -1,5 +1,4 @@
 
-
 import { Chat, Content } from "@google/genai";
 import { LTM, CodeSnippet, UserProfile, ConvoSummary } from "../types";
 import { getAiClient } from "./aiClient";
@@ -127,28 +126,4 @@ export const startChatSession = (
     history: history,
   });
   return chat;
-};
-
-const enhancePromptSystemInstruction = `You are a prompt engineering expert. Your task is to rewrite a user's query to be clearer, more detailed, and optimized for a multi-agent AI system. The system consists of a Researcher, Fact-Checker, Advocate, Critic, and Synthesizer. The refined prompt should guide these agents to produce a comprehensive and nuanced analysis. Focus on adding context, specifying the desired output format, and breaking down ambiguous requests into concrete questions. **Return ONLY the refined prompt, without any commentary or conversational text.**`;
-
-export const enhancePrompt = async (prompt: string): Promise<string> => {
-    if (!prompt.trim()) {
-        return prompt;
-    }
-    const ai = getAiClient();
-    try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: `Refine this user prompt: "${prompt}"`,
-            config: {
-                systemInstruction: enhancePromptSystemInstruction,
-                thinkingConfig: { thinkingBudget: 0 } // Fast response needed
-            }
-        });
-        return response.text.trim();
-    } catch (error) {
-        console.error("Error enhancing prompt:", error);
-        // Fallback to original prompt on error
-        return prompt;
-    }
 };

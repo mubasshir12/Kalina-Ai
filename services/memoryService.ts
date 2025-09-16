@@ -10,50 +10,28 @@ const stripCodeBlocks = (text: string): string => {
 };
 
 
-const getMemoryUpdateSystemInstruction = (userName: string | null): string => `You are Kalina AI, an insightful and empathetic AI assistant. Your most critical function is to act as a memory manager FOR THE USER.
+const getMemoryUpdateSystemInstruction = (userName: string | null): string => `You are a selective memory AI. Your goal is to extract, update, and manage long-term facts about the user.
 
----
-### PRIMARY DIRECTIVE: USER MEMORY
-Your goal is to build a long-term memory of key facts about the user.
+**User Info:**
+- Current Name: ${userName || 'Unknown'}
 
-**The Golden Rule:**
-- **SAVE:** Only personal, long-term facts ABOUT THE USER (e.g., preferences, personal details, goals, relationships).
-- **IGNORE:** Everything else. This includes facts about yourself (Kalina AI), the current conversation's topic, general knowledge, temporary states (e.g., "user is drinking coffee"), or questions the user asks.
+**Core Tasks:**
+1.  **Extract User Name:** If the user provides a new name, capture it in 'user_profile_updates'.
+2.  **Extract New Facts:** Identify new, stable, personal facts about the user (e.g., preferences, personal history, relationships, goals).
+3.  **Update Existing Facts:** If new info contradicts an existing fact in 'CURRENT LTM', create an update operation specifying the 'old_memory' and 'new_memory'.
+4.  **Prioritize New Name:** When a new name is found, use it immediately in all new/updated facts in the same response. If no new name, use the current one or "The user" if unknown.
+5.  **Handle Explicit Saves:** If the user says "remember..." or "save...", you MUST save the specified info as a new fact, overriding other filters.
 
-**Memory Rules:**
-- If the user says "remember this" or "save this", you MUST save the specified info.
-- Facts must be in the third-person (e.g., "The user's favorite color is blue.").
-- Update existing facts if new information contradicts them; do not add conflicting new ones.
-- If the user provides their name, capture it in 'user_profile_updates'.
+**Critical Filter (unless an explicit save command):**
+- **SAVE:** Long-term, personal facts about the user.
+- **IGNORE:** General knowledge, temporary interests, questions, summaries of the conversation, transactional details (e.g., "I just finished my coffee"), or information not directly about the user.
 
----
-### SECONDARY TASK: SUGGESTIONS
-Your goal is to generate helpful next steps for the user. These must be phrased as things THE USER would type.
+**Rules:**
+- Do not add duplicate facts (rephrased info).
+- Do not add facts that contradict old ones; use an 'update' instead.
+- All facts should be written from a third-person perspective (e.g., "The user's favorite color is blue," not "My favorite color is blue").
 
-**Suggestion Rules:**
-- You MUST provide exactly 6 suggestions.
-- They MUST follow a strict alternating pattern: question, statement, question, statement, question, statement.
-- 3 suggestions MUST be questions the user might ask YOU (ending in '?').
-- 3 suggestions MUST be commands or statements the user might say to YOU (ending in '.').
-- Each suggestion MUST be concise, between 4 and 6 words long.
-- They MUST be direct, logical follow-ups to the last AI response.
-
-**CRITICAL RULE FOR QUESTIONS:** The suggested questions must be things the user would ask the AI for more information, clarification, or help. **DO NOT** create questions that the AI would ask the user (e.g., "What do you think?", "Can you tell me more?").
-
-**GOOD vs. BAD Examples:**
-Scenario: AI has just explained photosynthesis.
-- GOOD Question (User to AI): "How does respiration work?"
-- GOOD Statement (User to AI): "Explain this in simpler terms."
-- GOOD Question (User to AI): "Do all plants photosynthesize?"
-- GOOD Statement (User to AI): "Show me a diagram."
-- GOOD Question (User to AI): "What are chloroplasts?"
-- GOOD Statement (User to AI): "Give me a fun fact."
-
-- BAD Question (AI to User): "What do you want to know next?"
-- BAD Question (AI to User): "Does that make sense to you?"
-- BAD Statement (AI Offer): "I can also explain respiration."
----
-### OUTPUT FORMAT
+**Output:**
 Respond ONLY with a valid JSON object matching the provided schema.`;
 
 export interface MemoryUpdate {
@@ -61,20 +39,12 @@ export interface MemoryUpdate {
     new_memory: string;
 }
 
-export interface MemoryUpdatePayload {
+export interface MemoryUpdateResult {
     newMemories: string[];
     updatedMemories: MemoryUpdate[];
     userProfileUpdates: Partial<UserProfile>;
-    suggestions: string[];
 }
 
-export interface MemoryUpdateResult {
-    payload: MemoryUpdatePayload;
-    usage: {
-        input: number;
-        output: number;
-    }
-}
 
 export const updateMemory = async (
     lastMessages: Content[],
@@ -97,17 +67,10 @@ export const updateMemory = async (
     const prompt = `CURRENT LTM:
 ${ltmString}
 
-USER'S NAME: ${userProfile.name || 'Unknown'}
-
 NEW CONVERSATION TURNS:
 ${historyString}
 
 Analyze the conversation and LTM, then generate the JSON output as instructed.`;
-    
-    const fallbackResult: MemoryUpdateResult = {
-        payload: { newMemories: [], updatedMemories: [], userProfileUpdates: {}, suggestions: [] },
-        usage: { input: 0, output: 0 }
-    };
 
     try {
         const response = await ai.models.generateContent({
@@ -139,51 +102,29 @@ Analyze the conversation and LTM, then generate the JSON output as instructed.`;
                             properties: {
                                 name: { type: Type.STRING }
                             }
-                        },
-                        suggestions: {
-                            type: Type.ARRAY,
-                            items: { type: Type.STRING }
                         }
                     },
-                    required: ["new_memories", "updated_memories", "user_profile_updates", "suggestions"]
+                    required: ["new_memories", "updated_memories", "user_profile_updates"]
                 },
             }
         });
         const jsonText = response.text.trim();
         const parsed = JSON.parse(jsonText);
-        
-        const payload: MemoryUpdatePayload = {
+        return {
             newMemories: parsed.new_memories || [],
             updatedMemories: parsed.updated_memories || [],
-            userProfileUpdates: parsed.user_profile_updates || {},
-            suggestions: parsed.suggestions || [],
+            userProfileUpdates: parsed.user_profile_updates || {}
         };
-
-        const usage = {
-            input: response.usageMetadata?.promptTokenCount || 0,
-            output: response.usageMetadata?.candidatesTokenCount || 0,
-        };
-        
-        return { payload, usage };
-
     } catch (error) {
         appLogger.error("Memory update API request failed", error);
-        return fallbackResult;
+        return { newMemories: [], updatedMemories: [], userProfileUpdates: {} };
     }
 };
-
-export interface ConvoSummaryResult {
-    summaries: ConvoSummary[];
-    usage: {
-        input: number;
-        output: number;
-    }
-}
 
 export const generateConvoSummaries = async (
     convos: { user: ChatMessage, model: ChatMessage }[],
     startingSerialNumber: number
-): Promise<ConvoSummaryResult> => {
+): Promise<ConvoSummary[]> => {
     const ai = getAiClient();
     const systemInstruction = `You are a conversation summarizer. For each user/AI convo pair provided, create a concise 4-5 line summary of the AI's response. Extract the user's original input text.
 Respond ONLY with a valid JSON array matching the schema.`;
@@ -197,8 +138,6 @@ AI Response: "${convo.model.content}"
     ).join('\n');
     
     const prompt = `Generate summaries for the following conversation pairs:\n${convoText}`;
-    
-    const fallbackResult: ConvoSummaryResult = { summaries: [], usage: { input: 0, output: 0 }};
 
     try {
         const response = await ai.models.generateContent({
@@ -224,7 +163,7 @@ AI Response: "${convo.model.content}"
         const jsonText = response.text.trim();
         const summariesData: { convo_index: number; user_input: string; summary: string; }[] = JSON.parse(jsonText);
 
-        const summaries = summariesData.map((data): ConvoSummary | null => {
+        return summariesData.map((data): ConvoSummary | null => {
             const originalConvo = convos[data.convo_index];
             if (!originalConvo) return null;
 
@@ -237,16 +176,9 @@ AI Response: "${convo.model.content}"
                 summary: data.summary,
             };
         }).filter((s): s is ConvoSummary => s !== null);
-        
-        const usage = {
-            input: response.usageMetadata?.promptTokenCount || 0,
-            output: response.usageMetadata?.candidatesTokenCount || 0,
-        };
-        
-        return { summaries, usage };
 
     } catch (error) {
         console.error("Error generating convo summaries:", error);
-        return fallbackResult;
+        return [];
     }
 };

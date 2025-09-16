@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Content, Part } from '@google/genai';
-import { ChatMessage as ChatMessageType, Suggestion, ChatModel, LTM, CodeSnippet, GroundingChunk, UserProfile, Tool, Conversation, AgentName, AgentProcess } from '../types';
+import { ChatMessage as ChatMessageType, Suggestion, ChatModel, LTM, CodeSnippet, GroundingChunk, UserProfile, Tool, Conversation } from '../types';
 import { getAiClient } from '../services/aiClient';
 import { startChatSession, buildSystemInstruction } from '../services/chatService';
 import { planResponse } from '../services/geminiService';
@@ -14,7 +14,6 @@ import { developerProfile } from '../services/developerProfile';
 import { getPersonaContext } from '../services/personaService';
 import { getCapabilitiesContext } from '../services/capabilitiesService';
 import { initializeSummarizer, queueSummarizationTasks } from '../services/summarizationService';
-import { runAgentWorkflow } from '../services/multiAgentService';
 
 const models = [
     { id: 'gemini-2.5-flash', name: 'Kalina 2.5 Flash' },
@@ -68,26 +67,7 @@ export const useChatHandler = ({
     setLtm,
     setCodeMemory,
     setUserProfile,
-    setActiveSuggestion,
-    setSuggestions
-}: {
-    apiKey: string | null;
-    conversations: Conversation[];
-    activeConversationId: string | null;
-    ltm: LTM;
-    codeMemory: CodeSnippet[];
-    userProfile: UserProfile;
-    selectedTool: Tool;
-    selectedChatModel: ChatModel;
-    updateConversation: (conversationId: string, updater: (convo: Conversation) => Conversation) => void;
-    updateConversationMessages: (conversationId: string, updater: (messages: ChatMessageType[]) => ChatMessageType[]) => void;
-    setConversations: React.Dispatch<React.SetStateAction<Conversation[]>>;
-    setActiveConversationId: React.Dispatch<React.SetStateAction<string | null>>;
-    setLtm: React.Dispatch<React.SetStateAction<LTM>>;
-    setCodeMemory: React.Dispatch<React.SetStateAction<CodeSnippet[]>>;
-    setUserProfile: React.Dispatch<React.SetStateAction<UserProfile>>;
-    setActiveSuggestion: React.Dispatch<React.SetStateAction<Suggestion | null>>;
-    setSuggestions: React.Dispatch<React.SetStateAction<string[]>>;
+    setActiveSuggestion
 }) => {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [isThinking, setIsThinking] = useState<boolean>(false);
@@ -102,21 +82,15 @@ export const useChatHandler = ({
     const isCancelledRef = useRef(false);
     const responseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const responseStartTimeRef = useRef(0);
-    const { logError, addLog, addTokenLog } = useDebug();
+    const { logError, addLog } = useDebug();
     const summarizerInitialized = useRef(false);
-
-    // Create a ref to hold the latest conversations state to fix stale closures in the async handler.
-    const conversationsRef = useRef(conversations);
-    useEffect(() => {
-        conversationsRef.current = conversations;
-    }, [conversations]);
 
     useEffect(() => {
         if (!summarizerInitialized.current) {
-            initializeSummarizer(updateConversation, addTokenLog);
+            initializeSummarizer(updateConversation);
             summarizerInitialized.current = true;
         }
-    }, [updateConversation, addTokenLog]);
+    }, [updateConversation]);
 
 
     const clearThinkingIntervals = useCallback(() => {
@@ -226,95 +200,21 @@ export const useChatHandler = ({
             setElapsedTime(elapsed);
         }, 53);
 
+        const planningMessage: ChatMessageType = { id: crypto.randomUUID(), role: 'model', content: '', isPlanning: true, modelUsed: modelToUse, timestamp: new Date().toISOString() };
+        
         if (!isRetry) {
             const newUserMessage: ChatMessageType = { id: crypto.randomUUID(), role: 'user', content: fullPrompt, images: images, file: file, url: url, modelUsed: modelToUse, timestamp: new Date().toISOString() };
-            updateConversationMessages(currentConversationId, prev => [...prev, newUserMessage]);
+            updateConversationMessages(currentConversationId, prev => [...prev, newUserMessage, planningMessage]);
+        } else {
+            updateConversationMessages(currentConversationId, prev => [...prev, planningMessage]);
         }
-
-        // --- Multi-Agent Workflow ---
-        if (selectedTool === 'multi-agent') {
-            const allAgents = new Set<AgentName>(['researcher', 'fact-checker', 'advocate', 'critic', 'executer', 'finalizer']);
-
-            const multiAgentMessage: ChatMessageType = {
-                id: crypto.randomUUID(), role: 'model', content: '', isMultiAgent: true, toolInUse: 'multi-agent', activeAgent: 'researcher', agentProcess: [], timestamp: new Date().toISOString(),
-            };
-            updateConversationMessages(currentConversationId, prev => [...prev, multiAgentMessage]);
-
-            let allSources: GroundingChunk[] = [];
-            const agentProcesses: AgentProcess[] = [];
-
-            await runAgentWorkflow(
-                fullPrompt, allAgents,
-                (progress) => { // onProgress
-                    if (isCancelledRef.current) return;
-                    
-                    if (progress.status === 'started') {
-                        updateConversationMessages(currentConversationId, prev => prev.map((m, i) => 
-                            i === prev.length - 1 
-                                ? { ...m, activeAgent: progress.agent, activeAgentStatusMessage: "Initializing..." } 
-                                : m
-                        ));
-                    } else if (progress.status === 'working' && progress.message) {
-                        updateConversationMessages(currentConversationId, prev => prev.map((m, i) => 
-                            i === prev.length - 1 
-                                ? { ...m, activeAgentStatusMessage: progress.message } 
-                                : m
-                        ));
-                    } else if (progress.status === 'finished' && progress.duration) {
-                        agentProcesses.push({ agent: progress.agent, duration: progress.duration, usedWebSearch: progress.usedWebSearch });
-                        // Sort the processes to ensure they render in the correct pipeline order
-                        const sortedProcesses = agentProcesses.sort((a, b) => {
-                            const order: AgentName[] = ['researcher', 'fact-checker', 'advocate', 'critic', 'executer', 'finalizer'];
-                            return order.indexOf(a.agent) - order.indexOf(b.agent);
-                        });
-                        updateConversationMessages(currentConversationId, prev => prev.map((m, i) => 
-                            i === prev.length - 1 
-                                ? { ...m, agentProcess: sortedProcesses } 
-                                : m
-                        ));
-                    }
-                },
-                (chunk) => { // onStream
-                    if (isCancelledRef.current) return;
-                    updateConversationMessages(currentConversationId, prev => {
-                        const last = prev[prev.length - 1];
-                        return [...prev.slice(0, -1), { ...last, content: (last.content || '') + chunk }];
-                    });
-                },
-                (sources) => { // onSources
-                    if (isCancelledRef.current) return; allSources.push(...sources);
-                },
-                (finalResult) => { // onFinalResult
-                    if (isCancelledRef.current) return;
-                    const { promptTokenCount, candidatesTokenCount } = finalResult.usage;
-                    addTokenLog({ source: 'Multi-Agent', inputTokens: promptTokenCount, outputTokens: candidatesTokenCount, details: `${allAgents.size} agents` });
-                    
-                    updateConversationMessages(currentConversationId, prev => {
-                        const last = prev[prev.length - 1];
-                        return [...prev.slice(0, -1), {
-                            ...last, isMultiAgent: false, activeAgent: undefined, sources: allSources.length > 0 ? allSources : undefined, agentProcess: agentProcesses,
-                            inputTokens: promptTokenCount, outputTokens: candidatesTokenCount, generationTime: Date.now() - responseStartTimeRef.current,
-                        }];
-                    });
-                    setIsLoading(false);
-                    stopResponseTimer();
-                    setActiveSuggestion(null);
-                }
-            );
-            return; // End execution for multi-agent
-        }
-
-        // --- Standard Workflow ---
-        const planningMessage: ChatMessageType = { id: crypto.randomUUID(), role: 'model', content: '', isPlanning: true, modelUsed: modelToUse, timestamp: new Date().toISOString() };
-        updateConversationMessages(currentConversationId, prev => [...prev, planningMessage]);
 
         let longToolUseTimer: ReturnType<typeof setTimeout> | null = null;
         let isImageAnalysisRequest = false;
         let isFileAnalysisRequest = false;
 
         try {
-            const { plan, usage: plannerUsage } = await planResponse(fullPrompt, images, file, modelToUse, conversationForThisTurn.plannerContext);
-            addTokenLog({ source: 'Planner', inputTokens: plannerUsage.input, outputTokens: plannerUsage.output, details: modelToUse });
+            const plan = await planResponse(fullPrompt, images, file, modelToUse, conversationForThisTurn.plannerContext);
             if (isCancelledRef.current) return;
             
             let developerContext: string | undefined = undefined;
@@ -408,8 +308,8 @@ export const useChatHandler = ({
             }
 
             if (plan.isMoleculeRequest) {
-                const moleculeName = plan.correctedMoleculeName || fullPrompt;
-                updateConversationMessages(currentConversationId, prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, isPlanning: false, isMoleculeRequest: true, moleculeNameForAnimation: moleculeName } : m));
+                const moleculeName = plan.moleculeName || fullPrompt;
+                updateConversationMessages(currentConversationId, prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, isPlanning: false, isMoleculeRequest: true } : m));
                 
                 try {
                     const moleculeData = await getMoleculeData(moleculeName);
@@ -437,15 +337,6 @@ export const useChatHandler = ({
                     stopResponseTimer();
                     return;
                 }
-            }
-
-            if (plan.isOrbitalRequest) {
-                const orbitalName = plan.orbitalName || 'orbital';
-                updateConversationMessages(currentConversationId, prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, isPlanning: false, isOrbitalRequest: true, orbital: { name: orbitalName } } : m));
-                
-                finalPromptForModel = `I have displayed the ${orbitalName}. Now, please provide a brief, helpful description of its key characteristics (shape, nodes, number of electrons).`;
-                isWebSearchEnabled = false;
-                isThinkingEnabled = false;
             }
 
 
@@ -493,8 +384,7 @@ export const useChatHandler = ({
             let retrievedCodeSnippets: CodeSnippet[] = [];
             if (plan.needsCodeContext && codeMemory.length > 0) {
                 const codeDescriptions = codeMemory.map(({ id, description }) => ({ id, description }));
-                const { relevantIds, usage: findCodeUsage } = await findRelevantCode(fullPrompt, codeDescriptions);
-                addTokenLog({ source: 'Code Analyzer', inputTokens: findCodeUsage.input, outputTokens: findCodeUsage.output, details: 'Find Relevant' });
+                const relevantIds = await findRelevantCode(fullPrompt, codeDescriptions);
                  if (isCancelledRef.current) return;
                 retrievedCodeSnippets = codeMemory.filter(snippet => relevantIds.includes(snippet.id));
             }
@@ -586,7 +476,7 @@ export const useChatHandler = ({
                     const lastMessage = prevMessages[prevMessages.length - 1];
                     if (lastMessage?.role === 'model') {
                         const updatedMessages = [...prevMessages];
-                        updatedMessages[prevMessages.length - 1] = { ...lastMessage, content: displayContent, sources, isPlanning: false, isOrbitalRequest: false };
+                        updatedMessages[prevMessages.length - 1] = { ...lastMessage, content: displayContent, sources, isPlanning: false };
                         return updatedMessages;
                     }
                     // This case handles adding the very first model message chunk
@@ -595,21 +485,18 @@ export const useChatHandler = ({
             }
 
             if (usageMetadata && !isCancelledRef.current) {
-                const inputTokens = usageMetadata.promptTokenCount || 0;
-                const outputTokens = usageMetadata.candidatesTokenCount || 0;
-                
-                addTokenLog({ source: 'Chat', inputTokens, outputTokens, details: modelToUse });
-
                 updateConversationMessages(currentConversationId, prev => {
                     const lastMessage = prev[prev.length - 1];
                     if (lastMessage?.role === 'model') {
+                        const totalPromptTokens = usageMetadata.promptTokenCount || 0;
+                        const outputTokens = usageMetadata.candidatesTokenCount;
                         const userTextTokens = estimateTokens(fullPrompt);
 
                         // If a tool that adds significant content to the prompt was used (image, url, search), show the total prompt tokens to reflect the tool's cost.
                         // Otherwise (for normal chat or creator requests), only show the user's text tokens to hide history/system prompt cost.
                         const toolUsed = toolInUse || isImageAnalysisRequest || isFileAnalysisRequest || isWebSearchEnabled;
-                        const displayInputTokens = toolUsed ? inputTokens : userTextTokens;
-                        const systemTokens = toolUsed ? 0 : inputTokens - userTextTokens;
+                        const displayInputTokens = toolUsed ? totalPromptTokens : userTextTokens;
+                        const systemTokens = toolUsed ? 0 : totalPromptTokens - userTextTokens;
 
                         return [...prev.slice(0, -1), { 
                             ...lastMessage, 
@@ -623,12 +510,9 @@ export const useChatHandler = ({
             }
 
             const finalCleanedResponse = finalModelResponse.replace(/^\s*TITLE:\s*[^\n]*\n?/, '');
+            const finalConversationState = conversations.find(c => c.id === currentConversationId);
             
-            // FIX: Use the ref to get the most up-to-date conversations state.
-            const finalConversationState = conversationsRef.current.find(c => c.id === currentConversationId);
-            
-            // USER SUGGESTION & BUG FIX: Skip memory/suggestion logic on the very first turn.
-            if (!isFirstTurnInConversation && finalConversationState && !isCancelledRef.current) {
+            if (finalConversationState && !isCancelledRef.current) {
                  // New 'convo' summarization logic
                 if (finalConversationState.messages.length > 0 && finalConversationState.messages.length % 20 === 0) {
                     const convosToSummarize = [];
@@ -640,10 +524,7 @@ export const useChatHandler = ({
                     }
                     if (convosToSummarize.length > 0) {
                         generateConvoSummaries(convosToSummarize, finalConversationState.summaries?.length || 0)
-                            .then(({ summaries: newSummaries, usage: summaryUsage }) => {
-                                if (addTokenLog) {
-                                    addTokenLog({ source: 'Convo Summarizer', inputTokens: summaryUsage.input, outputTokens: summaryUsage.output });
-                                }
+                            .then(newSummaries => {
                                 updateConversation(currentConversationId, c => ({
                                     ...c,
                                     summaries: [...(c.summaries || []), ...newSummaries]
@@ -658,19 +539,13 @@ export const useChatHandler = ({
                 while ((match = codeBlockRegex.exec(finalCleanedResponse)) !== null) {
                     const capturedMatch = match;
                     processAndSaveCode({ language: capturedMatch[1] || 'text', code: capturedMatch[2] }, codeContextForSaving)
-                        .then(({ description, usage: codeSaveUsage }) => {
-                            addTokenLog({ source: 'Code Analyzer', inputTokens: codeSaveUsage.input, outputTokens: codeSaveUsage.output, details: 'Process & Save' });
-                            setCodeMemory(prev => [...prev, { id: crypto.randomUUID(), description, language: capturedMatch[1] || 'text', code: capturedMatch[2] }])
-                        });
+                        .then(result => setCodeMemory(prev => [...prev, { id: crypto.randomUUID(), ...result, language: capturedMatch[1] || 'text', code: capturedMatch[2] }]));
                 }
 
                 if (finalCleanedResponse.trim()) {
                     updateMemory([{ role: 'user', parts: [{ text: fullPrompt }] }, { role: 'model', parts: [{ text: finalCleanedResponse }] }], ltm, userProfile, modelToUse)
                         .then(memoryResult => {
-                            const { payload, usage: memoryUsage } = memoryResult;
-                            addTokenLog({ source: 'Memory/Suggestions', inputTokens: memoryUsage.input, outputTokens: memoryUsage.output, details: modelToUse });
-
-                            const { newMemories, updatedMemories, userProfileUpdates, suggestions } = payload;
+                            const { newMemories, updatedMemories, userProfileUpdates } = memoryResult;
                             
                             let logParts: string[] = [];
                             if (userProfileUpdates.name) {
@@ -723,11 +598,6 @@ export const useChatHandler = ({
                             // Update user profile
                             if (userProfileUpdates.name && userProfileUpdates.name !== userProfile.name) {
                                 setUserProfile(prev => ({ ...prev, name: userProfileUpdates.name }));
-                            }
-
-                            // Set new suggestions
-                            if (suggestions && suggestions.length > 0) {
-                                setSuggestions(suggestions);
                             }
                         });
                 }
@@ -812,8 +682,7 @@ export const useChatHandler = ({
     }, [
         apiKey, isLoading, activeConversationId, conversations, selectedChatModel, selectedTool, ltm, codeMemory, userProfile,
         setConversations, setActiveConversationId, setError, setIsLoading, updateConversationMessages, 
-        updateConversation, setCodeMemory, setLtm, setUserProfile, setActiveSuggestion, setSuggestions,
-        clearThinkingIntervals, stopResponseTimer, logError, addLog, addTokenLog
+        updateConversation, setCodeMemory, setLtm, setUserProfile, setActiveSuggestion, clearThinkingIntervals, stopResponseTimer, logError, addLog
     ]);
 
     return {

@@ -1,6 +1,8 @@
+
+
+
 import React, { useState } from 'react';
-import { Copy, Check, RefreshCw, ThumbsUp, ThumbsDown, Link } from 'lucide-react';
-import { GroundingChunk } from '../../types';
+import { Copy, Check, RefreshCw, ThumbsUp, ThumbsDown } from 'lucide-react';
 
 const stripMarkdown = (markdown: string): string => {
     if (!markdown) return '';
@@ -18,12 +20,9 @@ interface MessageToolbarProps {
     id: string;
     content: string;
     onRetry?: () => void;
-    isSelectionMode?: boolean;
-    sources?: GroundingChunk[];
-    onViewSources?: () => void;
 }
 
-const MessageToolbar: React.FC<MessageToolbarProps> = ({ id, content, onRetry, isSelectionMode, sources, onViewSources }) => {
+const MessageToolbar: React.FC<MessageToolbarProps> = ({ id, content, onRetry }) => {
     const [isCopied, setIsCopied] = useState(false);
     const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
 
@@ -35,10 +34,6 @@ const MessageToolbar: React.FC<MessageToolbarProps> = ({ id, content, onRetry, i
             setTimeout(() => setIsCopied(false), 2000);
         }
     };
-
-    if (isSelectionMode) {
-        return null;
-    }
 
     return (
         <div className="mt-3 flex items-center gap-2 text-neutral-500 dark:text-gray-400">
@@ -52,11 +47,6 @@ const MessageToolbar: React.FC<MessageToolbarProps> = ({ id, content, onRetry, i
             {onRetry && (
                 <button onClick={onRetry} className="p-1.5 hover:bg-neutral-200 dark:hover:bg-gray-700 rounded-full transition-colors" aria-label="Retry">
                     <RefreshCw className="h-5 w-5" />
-                </button>
-            )}
-            {sources && sources.length > 0 && onViewSources && (
-                 <button onClick={onViewSources} className="p-1.5 hover:bg-neutral-200 dark:hover:bg-gray-700 rounded-full transition-colors" aria-label="View sources">
-                    <Link className="h-5 w-5" />
                 </button>
             )}
             {content && (

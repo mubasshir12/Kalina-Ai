@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Lightbulb, BarChart3, Code2, BugPlay, DatabaseZap, HelpCircle, Mail, BookOpenText, GitCompareArrows, ChefHat, Share2, Presentation, Sparkles, FlaskConical, Atom, BotMessageSquare } from 'lucide-react';
+import { Lightbulb, BarChart3, Code2, BugPlay, DatabaseZap, HelpCircle, Mail, BookOpenText, GitCompareArrows, ChefHat, Share2, Presentation, Sparkles, FlaskConical } from 'lucide-react';
 import { Suggestion } from '../types';
 
 interface WelcomeScreenProps {
@@ -52,11 +52,6 @@ const allSuggestions: Suggestion[] = [
         icon: <BookOpenText className="h-5 w-5 text-indigo-500" />,
         prompt: "Summarize the key events of World War II in three paragraphs."
     },
-     { 
-        text: "Use AI Agents", 
-        icon: <BotMessageSquare className="h-5 w-5 text-cyan-500" />,
-        prompt: "Do a market analysis on the future of electric vehicles using the full multi-agent team."
-    },
     {
         text: "Compare and contrast",
         icon: <GitCompareArrows className="h-5 w-5 text-green-500" />,
@@ -66,11 +61,6 @@ const allSuggestions: Suggestion[] = [
         text: "Visualize caffeine", 
         icon: <FlaskConical className="h-5 w-5 text-emerald-500" />,
         prompt: "Show me the 3D structure of caffeine"
-    },
-    { 
-        text: "Visualize a p-orbital", 
-        icon: <Atom className="h-5 w-5 text-blue-500" />,
-        prompt: "Show me what a p orbital looks like"
     },
     { 
         text: "Explain covalent bonds", 

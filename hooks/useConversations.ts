@@ -1,32 +1,50 @@
-
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Conversation, ChatMessage as ChatMessageType } from '../types';
-import { getConversations, saveConversation, deleteConversation as deleteConversationFromDB } from '../services/dbService';
 
 export const useConversations = () => {
-    const [conversations, setConversations] = useState<Conversation[]>([]);
-    
-    useEffect(() => {
-        getConversations().then(storedConvos => {
+    const [conversations, setConversations] = useState<Conversation[]>(() => {
+        try {
+            const storedConvos = localStorage.getItem('kalina_conversations');
             if (storedConvos) {
-                const parsedConvos = storedConvos.map(convo => ({
+                const parsedConvos: Conversation[] = JSON.parse(storedConvos);
+                // Migration: Add createdAt and plannerContext if missing
+                return parsedConvos.map(convo => ({
                     ...convo,
                     createdAt: convo.createdAt || new Date().toISOString(),
-                    plannerContext: convo.plannerContext || [],
+                    plannerContext: convo.plannerContext || [], // Initialize if missing
                 }));
-                setConversations(parsedConvos);
             }
-        }).catch(e => console.error("Failed to load conversations from IndexedDB", e));
-    }, []);
+            return [];
+        } catch (e) {
+            console.error("Failed to parse conversations from localStorage", e);
+            return [];
+        }
+    });
 
     const [activeConversationId, setActiveConversationId] = useState<string | null>(() => {
         try {
-            return localStorage.getItem('kalina_active_conversation_id');
+            const storedActiveId = localStorage.getItem('kalina_active_conversation_id');
+            const convosString = localStorage.getItem('kalina_conversations'); // Need to read it again
+            if (storedActiveId && convosString) {
+                const convos: Conversation[] = JSON.parse(convosString);
+                if (convos.some(c => c.id === storedActiveId)) {
+                    return storedActiveId;
+                }
+            }
+            return null;
         } catch (e) {
             console.error("Failed to parse active conversation ID from localStorage", e);
             return null;
         }
     });
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('kalina_conversations', JSON.stringify(conversations));
+        } catch (e) {
+            console.error("Failed to save conversations to localStorage", e);
+        }
+    }, [conversations]);
 
     useEffect(() => {
         try {
@@ -49,6 +67,7 @@ export const useConversations = () => {
         return [...conversations].sort((a, b) => {
             if (a.isPinned && !b.isPinned) return -1;
             if (!a.isPinned && b.isPinned) return 1;
+            // If pinning is the same, sort by creation date, newest first
             if (a.createdAt && b.createdAt) {
                 return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
             }
@@ -57,23 +76,11 @@ export const useConversations = () => {
     }, [conversations]);
 
     const updateConversation = useCallback((conversationId: string, updater: (convo: Conversation) => Conversation) => {
-        setConversations(prev => {
-            let updatedConvo: Conversation | null = null;
-            const newConvos = prev.map(c => {
-                if (c.id === conversationId) {
-                    updatedConvo = updater(c);
-                    return updatedConvo;
-                }
-                return c;
-            });
-
-            if (updatedConvo) {
-                saveConversation(updatedConvo).catch(e => {
-                    console.error("Failed to save updated conversation to IndexedDB", e);
-                });
-            }
-            return newConvos;
-        });
+        setConversations(prev =>
+            prev.map(c =>
+                c.id === conversationId ? updater(c) : c
+            )
+        );
     }, []);
 
     const updateConversationMessages = useCallback((conversationId: string, updater: (messages: ChatMessageType[]) => ChatMessageType[]) => {
@@ -89,36 +96,22 @@ export const useConversations = () => {
             createdAt: new Date().toISOString(),
         };
 
-        saveConversation(newConversation).catch(e => {
-            console.error("Failed to save new conversation to IndexedDB", e);
-        });
-
         setConversations(prev => [newConversation, ...prev]);
         setActiveConversationId(newConversationId);
     }, []);
 
     const handleSelectConversation = useCallback((id: string) => {
-        // Verify conversation exists before setting it as active
-        if (conversations.some(c => c.id === id)) {
-            setActiveConversationId(id);
-        }
-    }, [conversations]);
+        setActiveConversationId(id);
+    }, []);
 
     const handleRenameConversation = useCallback((id: string, newTitle: string) => {
         updateConversation(id, c => ({ ...c, title: newTitle }));
     }, [updateConversation]);
 
     const handleDeleteConversation = useCallback((id: string) => {
-        deleteConversationFromDB(id).catch(e => {
-            console.error("Failed to delete conversation from IndexedDB", e);
-        });
-
-        const remainingConvos = conversations.filter(c => c.id !== id);
-        setConversations(remainingConvos);
-
+        setConversations(prev => prev.filter(c => c.id !== id));
         if (activeConversationId === id) {
-            const newActiveId = remainingConvos.length > 0 ? (sortedConversations.find(c => c.id !== id)?.id ?? null) : null;
-            setActiveConversationId(newActiveId);
+            setActiveConversationId(conversations.length > 1 ? (sortedConversations.find(c => c.id !== id)?.id ?? null) : null);
         }
     }, [activeConversationId, conversations, sortedConversations]);
 

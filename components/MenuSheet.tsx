@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { BrainCircuit, BarChart3, Terminal, ListChecks, HardDrive } from 'lucide-react';
+import { BrainCircuit, BarChart3, Terminal } from 'lucide-react';
 import { ConsoleMode } from '../types';
 import { IS_DEV_CONSOLE_ENABLED } from '../config';
 import { useDraggableSheet } from '../hooks/useDraggableSheet';
@@ -9,13 +9,8 @@ interface MenuSheetProps {
     onClose: () => void;
     onShowMemory: () => void;
     onShowUsage: () => void;
-    onShowStorage: () => void;
     consoleMode: ConsoleMode;
     setConsoleMode: (mode: ConsoleMode) => void;
-    isChatView: boolean;
-    hasActiveConversation: boolean;
-    isSelectionMode: boolean;
-    onToggleSelectionMode: () => void;
 }
 
 const MenuSheet: React.FC<MenuSheetProps> = ({
@@ -23,13 +18,8 @@ const MenuSheet: React.FC<MenuSheetProps> = ({
     onClose,
     onShowMemory,
     onShowUsage,
-    onShowStorage,
     consoleMode,
-    setConsoleMode,
-    isChatView,
-    hasActiveConversation,
-    isSelectionMode,
-    onToggleSelectionMode
+    setConsoleMode
 }) => {
     const sheetRef = useRef<HTMLDivElement>(null);
     const { sheetStyle, handleRef } = useDraggableSheet(sheetRef, onClose, isOpen);
@@ -38,23 +28,6 @@ const MenuSheet: React.FC<MenuSheetProps> = ({
         action();
         onClose();
     };
-
-    const handleModeChange = () => {
-        if (consoleMode === 'auto') {
-            setConsoleMode('manual');
-        } else if (consoleMode === 'manual') {
-            setConsoleMode('disabled');
-        } else { // 'disabled'
-            setConsoleMode('auto');
-        }
-    };
-
-    const modeInfo: Record<ConsoleMode, { text: string, description: string }> = {
-        auto: { text: 'Auto', description: 'Shows on error' },
-        manual: { text: 'On', description: 'Always available' },
-        disabled: { text: 'Off', description: 'Completely disabled' }
-    };
-
 
     return (
         <>
@@ -83,35 +56,28 @@ const MenuSheet: React.FC<MenuSheetProps> = ({
                             <BrainCircuit className="h-6 w-6 text-neutral-500 dark:text-gray-400" />
                             <span>Memory Management</span>
                         </button>
-                         <button onClick={() => handleLinkClick(onShowStorage)} className="w-full flex items-center gap-4 p-3 text-left text-base font-medium text-neutral-700 dark:text-gray-300 rounded-lg hover:bg-neutral-100 dark:hover:bg-gray-800/60 transition-colors">
-                            <HardDrive className="h-6 w-6 text-neutral-500 dark:text-gray-400" />
-                            <span>Storage Management</span>
-                        </button>
-
-                        {isChatView && hasActiveConversation && (
-                            <button onClick={() => handleLinkClick(onToggleSelectionMode)} className="w-full flex items-center gap-4 p-3 text-left text-base font-medium text-neutral-700 dark:text-gray-300 rounded-lg hover:bg-neutral-100 dark:hover:bg-gray-800/60 transition-colors">
-                                <ListChecks className="h-6 w-6 text-neutral-500 dark:text-gray-400" />
-                                <span>{isSelectionMode ? 'Cancel Selection' : 'Select Messages'}</span>
-                            </button>
-                        )}
-
                         {IS_DEV_CONSOLE_ENABLED && (
                             <>
                                 <div className="border-t border-neutral-200 dark:border-gray-600 my-2" />
-                                <div className="p-3 text-neutral-700 dark:text-gray-300">
+                                <div className="p-3 text-neutral-700 dark:text-gray-300 rounded-lg hover:bg-neutral-100 dark:hover:bg-gray-800/60 transition-colors">
                                     <div className="flex items-center gap-4">
                                         <Terminal className="h-6 w-6 text-neutral-500 dark:text-gray-400" />
                                         <div className="flex-1">
                                             <span className="text-base font-medium">Developer Console</span>
                                             <p className="text-xs text-neutral-500 dark:text-gray-400">
-                                                {modeInfo[consoleMode]?.description || '...'}
+                                                {consoleMode === 'auto' ? 'Auto-shows on error' : 'Always visible'}
                                             </p>
                                         </div>
                                         <button
-                                            onClick={handleModeChange}
-                                            className="px-4 py-1.5 text-sm font-semibold rounded-full bg-neutral-200 dark:bg-gray-700 hover:bg-neutral-300 dark:hover:bg-gray-600 transition-colors"
+                                            onClick={() => setConsoleMode(consoleMode === 'auto' ? 'manual' : 'auto')}
+                                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 dark:focus:ring-offset-[#1e1f22] ${consoleMode === 'manual' ? 'bg-amber-600' : 'bg-neutral-300 dark:bg-gray-600'}`}
+                                            role="switch"
+                                            aria-checked={consoleMode === 'manual'}
                                         >
-                                            {modeInfo[consoleMode]?.text || '...'}
+                                            <span
+                                                aria-hidden="true"
+                                                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${consoleMode === 'manual' ? 'translate-x-5' : 'translate-x-0'}`}
+                                            />
                                         </button>
                                     </div>
                                 </div>

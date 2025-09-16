@@ -90,20 +90,6 @@
         margin: 0.25rem 0;
         padding-left: 1.25rem;
       }
-      @keyframes fade-in-up {
-        from {
-            opacity: 0;
-            transform: translateY(10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-      }
-      .animate-fade-in-up {
-          animation: fade-in-up 0.4s ease-out forwards;
-          opacity: 0; /* Start hidden */
-      }
     </style>
     <script>
       // On page load or when changing themes, best to add inline in `head` to avoid FOUC
@@ -141,6 +127,7 @@
     "react-dom": "https://aistudiocdn.com/react-dom@^19.1.1",
     "three": "https://unpkg.com/three@0.142.0/build/three.module.js",
     "three/examples/jsm/controls/OrbitControls.js": "https://unpkg.com/three@0.142.0/examples/jsm/controls/OrbitControls.js",
+    "three/examples/jsm/renderers/CSS2DRenderer.js": "https://unpkg.com/three@0.142.0/examples/jsm/renderers/CSS2DRenderer.js",
     "gsap": "https://unpkg.com/gsap@3.10.4/index.js",
     "three/": "https://aistudiocdn.com/three@^0.179.1/"
   }

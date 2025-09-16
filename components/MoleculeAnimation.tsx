@@ -1,14 +1,6 @@
 import React from 'react';
 
-interface MoleculeAnimationProps {
-    moleculeName?: string;
-}
-
-const MoleculeAnimation: React.FC<MoleculeAnimationProps> = ({ moleculeName }) => {
-    const displayText = moleculeName
-        ? `Searching ${moleculeName} in database...`
-        : 'Searching database for 3D model...';
-
+const MoleculeAnimation: React.FC = () => {
     return (
         <div className="flex flex-col items-center justify-center my-4 p-4 gap-6">
             <style>{`
@@ -54,7 +46,7 @@ const MoleculeAnimation: React.FC<MoleculeAnimationProps> = ({ moleculeName }) =
                 <div className="electron electron-2"></div>
             </div>
             <p className="text-center text-sm text-neutral-500 dark:text-gray-400">
-                {displayText}
+                Searching PubChem for 3D model...
             </p>
         </div>
     );

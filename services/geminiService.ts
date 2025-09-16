@@ -21,18 +21,15 @@ Set to true if the user asks who created you, your developer, or your origin.
 Set to true if the user asks what you can do, about your tools, or your abilities (e.g., "what are your skills?", "can you generate images?").
 
 **5. Molecule Visualization (isMoleculeRequest: true):**
-Set to true if the user asks to see a 3D model or structure of a chemical compound (e.g., "show me water in 3D", "what does caffeine look like?"). You MUST analyze the user's input, correct any spelling mistakes, and find the canonical name of the compound. Extract the corrected name into \`correctedMoleculeName\`.
+Set to true if the user asks to see a 3D model or structure of a chemical compound (e.g., "show me water in 3D", "what does caffeine look like?"). Extract the name of the compound into \`moleculeName\`.
 
-**6. Atomic Orbital Visualization (isOrbitalRequest: true):**
-Set to true if the user asks to see or visualize an atomic orbital (e.g., "show me a p orbital", "what does a 3d orbital look like?"). Extract the specific orbital requested (e.g., 'p orbital', '3d orbital', 'dz2 orbital') into \`orbitalName\`.
-
-**7. File Analysis:**
+**6. File Analysis:**
 - If a file is attached, always set 'needsThinking' to true.
 
-**8. Complex Prompts (needsThinking: true):**
+**7. Complex Prompts (needsThinking: true):**
 Set to true for prompts requiring analysis, creativity, multi-step reasoning, coding, or file analysis.
 
-**9. Simple Prompts (needsThinking: false):**
+**8. Simple Prompts (needsThinking: false):**
 Set to false for basic conversational turns.
 
 **Output:**
@@ -44,9 +41,7 @@ Respond ONLY with a valid JSON object based on the prompt analysis.
 - \`isCreatorRequest\` (boolean): User is asking about the developer.
 - \`isCapabilitiesRequest\` (boolean): User is asking about your abilities.
 - \`isMoleculeRequest\` (boolean): User is asking for a 3D model of a molecule.
-- \`correctedMoleculeName\` (string, optional): The corrected, canonical name of the molecule if \`isMoleculeRequest\` is true.
-- \`isOrbitalRequest\` (boolean): User is asking for a 3D model of an atomic orbital.
-- \`orbitalName\` (string, optional): The name of the orbital if \`isOrbitalRequest\` is true.
+- \`moleculeName\` (string, optional): The name of the molecule if \`isMoleculeRequest\` is true.
 - \`needsThinking\` (boolean): Complex task.
 - \`needsCodeContext\` (boolean): Prompt relates to previous code.
 - \`thoughts\` (array, optional): If 'needsThinking' is true, provide a step-by-step plan.
@@ -68,22 +63,12 @@ export interface ResponsePlan {
     needsThinking: boolean;
     needsCodeContext: boolean;
     isMoleculeRequest: boolean;
-    correctedMoleculeName?: string;
-    isOrbitalRequest: boolean;
-    orbitalName?: string;
+    moleculeName?: string;
     thoughts: ThoughtStep[];
     searchPlan?: ThoughtStep[];
 }
 
-export interface PlanResponseResult {
-    plan: ResponsePlan;
-    usage: {
-        input: number;
-        output: number;
-    };
-}
-
-export const planResponse = async (prompt: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; }, model: string = 'gemini-2.5-flash', plannerContext?: PlannerContextItem[]): Promise<PlanResponseResult> => {
+export const planResponse = async (prompt: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; }, model: string = 'gemini-2.5-flash', plannerContext?: PlannerContextItem[]): Promise<ResponsePlan> => {
     const ai = getAiClient();
     try {
         let fullPrompt = prompt;
@@ -118,9 +103,7 @@ export const planResponse = async (prompt: string, images?: { base64: string; mi
                         isCreatorRequest: { type: Type.BOOLEAN },
                         isCapabilitiesRequest: { type: Type.BOOLEAN },
                         isMoleculeRequest: { type: Type.BOOLEAN },
-                        correctedMoleculeName: { type: Type.STRING },
-                        isOrbitalRequest: { type: Type.BOOLEAN },
-                        orbitalName: { type: Type.STRING },
+                        moleculeName: { type: Type.STRING },
                         needsThinking: { type: Type.BOOLEAN },
                         needsCodeContext: { type: Type.BOOLEAN },
                         thoughts: {
@@ -148,7 +131,7 @@ export const planResponse = async (prompt: string, images?: { base64: string; mi
                             }
                         }
                     },
-                    required: ["needsWebSearch", "isUrlReadRequest", "isCreatorRequest", "isCapabilitiesRequest", "needsThinking", "needsCodeContext", "isMoleculeRequest", "isOrbitalRequest"],
+                    required: ["needsWebSearch", "isUrlReadRequest", "isCreatorRequest", "isCapabilitiesRequest", "needsThinking", "needsCodeContext", "isMoleculeRequest"],
                 }
             }
         });
@@ -156,24 +139,18 @@ export const planResponse = async (prompt: string, images?: { base64: string; mi
         const result = JSON.parse(jsonText);
 
         // If a tool-based request is made, disable general thinking to go straight to the task.
-        if (result.needsWebSearch || result.isUrlReadRequest || result.isMoleculeRequest || result.isOrbitalRequest) {
+        if (result.needsWebSearch || result.isUrlReadRequest || result.isMoleculeRequest) {
             result.needsThinking = false;
             result.thoughts = [];
         }
 
-        const plan: ResponsePlan = { ...result, thoughts: result.thoughts || [], searchPlan: result.searchPlan || [] };
-        const usage = {
-            input: response.usageMetadata?.promptTokenCount || 0,
-            output: response.usageMetadata?.candidatesTokenCount || 0,
-        };
-
-        return { plan, usage };
+        return { ...result, thoughts: result.thoughts || [], searchPlan: result.searchPlan || [] };
     } catch (error)
     {
         console.error("Error planning response:", error);
         // Fallback: If planning fails, assume web search is needed but disable thinking.
         const needsWebSearch = true;
-        const fallbackPlan: ResponsePlan = { 
+        return { 
             needsWebSearch: needsWebSearch,
             isUrlReadRequest: false,
             isCreatorRequest: false,
@@ -181,12 +158,8 @@ export const planResponse = async (prompt: string, images?: { base64: string; mi
             needsThinking: !needsWebSearch, // Ensures thinking is false if web search is true
             needsCodeContext: false, // <-- Changed from true to false for token efficiency on error
             isMoleculeRequest: false,
-            correctedMoleculeName: undefined,
-            isOrbitalRequest: false,
-            orbitalName: undefined,
             thoughts: [], // No thoughts when thinking is disabled
             searchPlan: []
         };
-        return { plan: fallbackPlan, usage: { input: 0, output: 0 } };
     }
 };

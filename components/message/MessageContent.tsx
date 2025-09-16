@@ -1,15 +1,11 @@
 import React from 'react';
-import { ChatMessage as ChatMessageType, MoleculeData, OrbitalData } from '../../types';
+import { ChatMessage as ChatMessageType } from '../../types';
 import MarkdownRenderer from '../MarkdownRenderer';
 import ThinkingProcess from '../ThinkingProcess';
 import WebSearchAnimation from '../WebSearchAnimation';
 import UrlReaderAnimation from '../ToolUsageAnimation';
 import MoleculeViewer from '../MoleculeViewer';
 import MoleculeAnimation from '../MoleculeAnimation';
-import OrbitalViewer from '../OrbitalViewer';
-import OrbitalAnimation from '../OrbitalAnimation';
-import MultiAgentProcessing from '../MultiAgentProcessing';
-import AgentBreakdown from '../AgentBreakdown';
 import { Brain } from 'lucide-react';
 
 const SkeletonLoader: React.FC = () => (
@@ -33,8 +29,6 @@ interface MessageContentProps extends ChatMessageType {
     isThinking?: boolean;
     isSearchingWeb?: boolean;
     setCodeForPreview: (data: { code: string; language: string; } | null) => void;
-    onMaximizeMoleculeViewer: (molecule: MoleculeData) => void;
-    onMaximizeOrbitalViewer: (orbital: OrbitalData) => void;
 }
 
 const MessageContent: React.FC<MessageContentProps> = ({
@@ -55,21 +49,8 @@ const MessageContent: React.FC<MessageContentProps> = ({
     setCodeForPreview,
     isMoleculeRequest,
     molecule,
-    onMaximizeMoleculeViewer,
-    moleculeNameForAnimation,
-    isOrbitalRequest,
-    orbital,
-    onMaximizeOrbitalViewer,
-    isMultiAgent,
-    activeAgent,
-    agentProcess,
-    activeAgentStatusMessage,
 }) => {
     const showThinkingProcess = isThinking || (thoughts && thoughts.length > 0);
-
-    if (isMultiAgent && toolInUse === 'multi-agent') {
-        return <MultiAgentProcessing activeAgent={activeAgent} agentProcess={agentProcess} activeAgentStatusMessage={activeAgentStatusMessage} />;
-    }
 
     return (
         <>
@@ -95,13 +76,11 @@ const MessageContent: React.FC<MessageContentProps> = ({
 
             {isPlanning && <SkeletonLoader />}
 
-            {isMoleculeRequest && <MoleculeAnimation moleculeName={moleculeNameForAnimation} />}
+            {isMoleculeRequest && <MoleculeAnimation />}
             
-            {isOrbitalRequest && <OrbitalAnimation orbitalName={orbital?.name} />}
+            {!isPlanning && toolInUse && <UrlReaderAnimation isLongToolUse={isLongToolUse} />}
 
-            {!isPlanning && toolInUse === 'url' && <UrlReaderAnimation isLongToolUse={isLongToolUse} />}
-
-            {!isPlanning && toolInUse !== 'url' && toolInUse !== 'multi-agent' && showThinkingProcess && (
+            {!isPlanning && !toolInUse && showThinkingProcess && (
                 <ThinkingProcess 
                     thoughts={thoughts || []} 
                     duration={thinkingDuration} 
@@ -114,9 +93,7 @@ const MessageContent: React.FC<MessageContentProps> = ({
                 isSearchingWeb ? <div className="flex justify-center items-center"><WebSearchAnimation plan={searchPlan} /></div> : <SkeletonLoader />
             )}
             
-            {molecule && <MoleculeViewer molecule={molecule} onMaximize={() => onMaximizeMoleculeViewer(molecule)} />}
-            
-            {orbital && <OrbitalViewer orbital={orbital} onMaximize={onMaximizeOrbitalViewer ? () => onMaximizeOrbitalViewer(orbital) : undefined} />}
+            {molecule && <MoleculeViewer molecule={molecule} />}
 
             <div className="text-neutral-800 dark:text-gray-200 leading-relaxed dark:blurry-text-effect">
             
@@ -124,10 +101,6 @@ const MessageContent: React.FC<MessageContentProps> = ({
             
             {isStreaming && content ? <span className="inline-block w-2 h-4 bg-neutral-800 dark:bg-white animate-pulse ml-1" /> : null}
             </div>
-
-            {agentProcess && agentProcess.length > 0 && !isStreaming && (
-                <AgentBreakdown process={agentProcess} />
-            )}
        </>
     );
 }

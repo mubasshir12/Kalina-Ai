@@ -1,12 +1,10 @@
 import React from 'react';
 
 export type ChatModel = 'gemini-2.5-flash' | 'gemini-2.5-pro' | 'gemini-2.5-flash-lite' | 'gemini-2.0-flash' | 'gemini-2.0-flash-lite';
-export type Tool = 'smart' | 'webSearch' | 'thinking' | 'translator' | 'urlReader' | 'chemistry' | 'multi-agent';
-export type View = 'chat' | 'memory' | 'translator' | 'usage' | 'usage-detail' | 'convo-detail' | 'editor' | 'image-editor' | 'storage' | 'molecule-viewer' | 'orbital-viewer' | 'word-analysis';
+export type Tool = 'smart' | 'webSearch' | 'thinking' | 'translator' | 'urlReader' | 'chemistry';
+export type View = 'chat' | 'memory' | 'translator' | 'usage' | 'usage-detail' | 'convo-detail' | 'editor' | 'image-editor';
 
 export type MessageRole = 'user' | 'model';
-
-export type AgentName = 'researcher' | 'fact-checker' | 'advocate' | 'critic' | 'executer' | 'finalizer';
 
 export interface ModelInfo {
   id: ChatModel;
@@ -21,7 +19,6 @@ export interface Web {
 
 export interface GroundingChunk {
   web: Web;
-  agent?: AgentName;
 }
 
 export interface ThoughtStep {
@@ -55,17 +52,6 @@ export interface Location {
     details?: string;
 }
 
-export interface OrbitalData {
-    // e.g., '2p_x', '3d_xy'
-    name: string;
-}
-
-export interface AgentProcess {
-    agent: AgentName;
-    duration: number;
-    usedWebSearch?: boolean;
-}
-
 export interface ChatMessage {
   id: string;
   role: MessageRole;
@@ -91,7 +77,7 @@ export interface ChatMessage {
   isAnalyzingFile?: boolean;
   analysisCompleted?: boolean;
   isPlanning?: boolean;
-  toolInUse?: 'url' | 'multi-agent';
+  toolInUse?: 'url';
   isLongToolUse?: boolean;
   memoryUpdated?: boolean;
   inputTokens?: number; // User prompt tokens
@@ -100,13 +86,6 @@ export interface ChatMessage {
   generationTime?: number;
   isMoleculeRequest?: boolean;
   molecule?: MoleculeData;
-  moleculeNameForAnimation?: string;
-  isOrbitalRequest?: boolean;
-  orbital?: OrbitalData;
-  agentProcess?: AgentProcess[];
-  isMultiAgent?: boolean;
-  activeAgent?: AgentName;
-  activeAgentStatusMessage?: string;
 }
 
 export interface AppError {
@@ -168,7 +147,7 @@ export interface ConsoleLog {
 }
 
 // Types for the Developer Console
-export type ConsoleMode = 'auto' | 'manual' | 'disabled';
+export type ConsoleMode = 'auto' | 'manual';
 
 export interface ConsoleLogEntry {
     id: string;
@@ -176,15 +155,4 @@ export interface ConsoleLogEntry {
     level: 'log' | 'warn' | 'error';
     message: string;
     stack?: string;
-}
-
-export interface TokenLog {
-    id: string;
-    timestamp: string;
-    // FIX: Add 'AI Debugger' to the source type to allow logging tokens from the AI help feature.
-    source: 'Chat' | 'Memory/Suggestions' | 'Translator' | 'Planner' | 'Code Analyzer' | 'Convo Summarizer' | 'AI Debugger' | 'Multi-Agent';
-    inputTokens: number;
-    outputTokens: number;
-    totalTokens: number;
-    details?: string;
 }

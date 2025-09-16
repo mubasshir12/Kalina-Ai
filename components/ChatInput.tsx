@@ -1,14 +1,9 @@
-
-
-
 import React, { useState, KeyboardEvent, useRef, ChangeEvent, useEffect } from 'react';
 import { Suggestion, Tool, ChatModel, ModelInfo } from '../types';
-import { Sparkles, ChevronDown, X, Paperclip, ArrowUp, Globe, BrainCircuit, Image, Expand, File, Presentation, FileText, Camera, Languages, Link, ClipboardPaste, ChevronUp, Mic, FlaskConical, Pencil, Maximize2, BotMessageSquare, Wand2, LoaderCircle } from 'lucide-react';
+import { Sparkles, ChevronDown, X, Paperclip, ArrowUp, Globe, BrainCircuit, Image, Expand, File, Presentation, FileText, Camera, Languages, Link, ClipboardPaste, ChevronUp, Mic, FlaskConical, Pencil, Maximize2 } from 'lucide-react';
 import ModelSelector from './ModelSelector';
 import { compressImage } from '../utils/imageCompressor';
 import Tooltip from './Tooltip';
-import ToolSelectionModal from './ToolSelectionModal';
-import { enhancePrompt } from '../services/chatService';
 
 // Add type definitions for the Web Speech API to resolve TypeScript errors for SpeechRecognition and SpeechRecognitionEvent.
 interface SpeechRecognition {
@@ -42,13 +37,7 @@ interface SpeechRecognitionAlternative {
     readonly transcript: string;
 }
 
-type KeywordSuggestion = {
-    text: string;
-    type: 'code' | 'english';
-}
-
 interface ChatInputProps {
-  // FIX: Changed 'file' parameter to accept a single file object or undefined, not an array.
   onSendMessage: (message: string, images?: { base64: string; mimeType: string; }[], file?: { base64: string; mimeType: string; name: string; size: number; }, url?: string) => void;
   isLoading: boolean;
   elapsedTime: number;
@@ -75,13 +64,10 @@ interface ChatInputProps {
   input: string;
   setInput: React.Dispatch<React.SetStateAction<string>>;
   onOpenFullScreenEditor: () => void;
-  codeKeywords: string[];
-  englishWords: string[];
 }
 
-export const tools: { id: Tool; name: string; description: string; icon: React.ElementType }[] = [
+const tools: { id: Tool; name: string; description: string; icon: React.ElementType }[] = [
     { id: 'smart', name: 'Smart Mode', description: 'Automatically uses the best tool for the job.', icon: Sparkles },
-    { id: 'multi-agent', name: 'Multi-Agent', description: 'Use a team of AI agents for a detailed response.', icon: BotMessageSquare },
     { id: 'webSearch', name: 'Web Search', description: 'Searches the web for real-time info.', icon: Globe },
     { id: 'urlReader', name: 'URL Reader', description: 'Reads content from a web page URL.', icon: Link },
     { id: 'chemistry', name: 'Chemistry', description: 'Visualize molecules and solve chemistry problems.', icon: FlaskConical },
@@ -129,24 +115,21 @@ const ChatInput: React.FC<ChatInputProps> = ({
     input,
     setInput,
     onOpenFullScreenEditor,
-    codeKeywords,
-    englishWords,
 }) => {
   const [urlInput, setUrlInput] = useState('');
+  const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false);
   const [isProcessingAttachment, setIsProcessingAttachment] = useState(false);
   const [isMaxHeight, setIsMaxHeight] = useState(false);
-  const [keywordSuggestions, setKeywordSuggestions] = useState<KeywordSuggestion[]>([]);
   
   const [isListening, setIsListening] = useState(false);
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  const [isRefining, setIsRefining] = useState(false);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const toolsMenuRef = useRef<HTMLDivElement>(null);
   const attachmentMenuRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
@@ -188,17 +171,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  const handleRefine = async () => {
-    if (!input.trim() || isRefining || isLoading) return;
-    setIsRefining(true);
-    try {
-        const refinedPrompt = await enhancePrompt(input);
-        setInput(refinedPrompt);
-    } finally {
-        setIsRefining(false);
-    }
-  };
-
   useEffect(() => {
     if (textareaRef.current) {
         textareaRef.current.style.height = 'auto'; // Reset height to recalculate
@@ -216,7 +188,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         setInput(activeSuggestion.prompt);
     }
   }, [activeSuggestion, setInput]);
-
+  
     const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
         const selectedFiles = event.target.files;
         if (!selectedFiles || selectedFiles.length === 0) return;
@@ -343,69 +315,19 @@ const ChatInput: React.FC<ChatInputProps> = ({
   
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      if (toolsMenuRef.current && !toolsMenuRef.current.contains(event.target as Node)) setIsToolsOpen(false);
       if (attachmentMenuRef.current && !attachmentMenuRef.current.contains(event.target as Node)) setIsAttachmentMenuOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   
-    useEffect(() => {
-        if (!input.trim() || isLoading || activeSuggestion || (codeKeywords.length === 0 && englishWords.length === 0)) {
-            setKeywordSuggestions([]);
-            return;
-        }
-
-        const lastWordRegex = /[\w.]+$/;
-        const match = input.match(lastWordRegex);
-        const lastWord = match ? match[0].toLowerCase() : '';
-
-        if (!lastWord || lastWord.length < 2) {
-            setKeywordSuggestions([]);
-            return;
-        }
-
-        const codeSuggestions = codeKeywords
-            .filter(k => k.toLowerCase().startsWith(lastWord) && k.toLowerCase() !== lastWord)
-            .map(k => ({ text: k, type: 'code' as const }));
-
-        const englishSuggestions = englishWords
-            .filter(k => k.toLowerCase().startsWith(lastWord) && k.toLowerCase() !== lastWord)
-            .map(k => ({ text: k, type: 'english' as const }));
-
-        const combined = [...codeSuggestions, ...englishSuggestions];
-        const uniqueMap = new Map<string, KeywordSuggestion>();
-        combined.forEach(item => {
-            if (!uniqueMap.has(item.text)) {
-                uniqueMap.set(item.text, item);
-            }
-        });
-
-        const uniqueSuggestions = Array.from(uniqueMap.values()).slice(0, 7);
-        setKeywordSuggestions(uniqueSuggestions);
-
-    }, [input, isLoading, activeSuggestion, codeKeywords, englishWords]);
-
-    const handleKeywordClick = (keyword: string) => {
-        const lastWordRegex = /[\w.]+$/;
-        const match = input.match(lastWordRegex);
-
-        if (match && typeof match.index === 'number') {
-            const newInput = input.substring(0, match.index) + keyword + ' ';
-            setInput(newInput);
-        } else {
-            setInput(input + keyword + ' ');
-        }
-
-        setKeywordSuggestions([]);
-        textareaRef.current?.focus();
-    };
-
+  const selectedToolObject = tools.find(t => t.id === selectedTool) || tools[0];
+  const SelectedIcon = selectedToolObject.icon;
+  
   const placeholderText = () => {
-      if (isRefining) return "Refining your prompt...";
-      if (isLoading) return "Processing...";
       if (isListening) return "Listening...";
       if (selectedTool === 'urlReader') return "Ask a question about the URL above...";
-      if (selectedTool === 'multi-agent') return `Ask a question for the multi-agent system...`;
       if (images.length > 0) return `Ask a question about the ${images.length} image(s)...`;
       if (file) return `Ask a question about ${file.name}...`;
       return "Ask me anything...";
@@ -428,12 +350,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   // The button should be disabled for sending if attachments are processing or if there's no content.
-  const isSendDisabled = isRefining || isProcessingAttachment || (images.length === 0 && !file && !input.trim() && (selectedTool !== 'urlReader' || !urlInput.trim()));
+  const isSendActionDisabled = isProcessingAttachment || (images.length === 0 && !file && !input.trim() && (selectedTool !== 'urlReader' || !urlInput.trim()));
 
   const MicButton = () => (
     <button
         onClick={handleToggleListening}
-        disabled={isLoading || isRefining || !isSpeechSupported}
+        disabled={isLoading || !isSpeechSupported}
         className={`flex items-center justify-center w-10 h-10 p-2 rounded-full transition-all duration-200 ${
             isListening 
                 ? 'bg-red-500 text-white animate-pulse' 
@@ -455,11 +377,26 @@ const ChatInput: React.FC<ChatInputProps> = ({
           
           <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2">
-                <ToolSelectionModal 
-                    selectedTool={selectedTool}
-                    onToolChange={onToolChange}
-                    isJumperVisible={showConversationJumper}
-                />
+                <div className="relative" ref={toolsMenuRef}>
+                    <button onClick={() => setIsToolsOpen(!isToolsOpen)} className="flex items-center gap-2 px-3 py-1.5 text-neutral-700 dark:text-gray-300 bg-neutral-100 dark:bg-[#2E2F33] border border-neutral-300 dark:border-gray-600 rounded-xl hover:bg-neutral-200 dark:hover:bg-gray-700/70 transition-colors">
+                        <SelectedIcon className="h-5 w-5 text-amber-500 dark:text-amber-400 flex-shrink-0" />
+                        <span className={`font-medium leading-none transition-all duration-200 ${showConversationJumper ? 'text-xs' : 'text-sm'}`}>{selectedToolObject.name}</span>
+                        <ChevronDown className={`w-4 h-4 transition-transform ${isToolsOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {isToolsOpen && (
+                        <div className="absolute bottom-full mb-2 w-72 bg-white dark:bg-[#2E2F33] border border-neutral-200 dark:border-gray-600 rounded-lg shadow-xl overflow-hidden z-20">
+                            {tools.map(tool => (
+                                <button key={tool.id} onClick={() => { onToolChange(tool.id); setIsToolsOpen(false); }} className="w-full text-left p-3 text-neutral-800 dark:text-gray-200 hover:bg-neutral-100 dark:hover:bg-gray-700/70 transition-colors flex items-center gap-3">
+                                    <tool.icon className="h-5 w-5 text-neutral-500 dark:text-gray-400 flex-shrink-0" />
+                                    <div>
+                                        <p className="font-semibold text-sm">{tool.name}</p>
+                                        <p className="text-xs text-neutral-500 dark:text-gray-400">{tool.description}</p>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
                  <ModelSelector models={models} selectedChatModel={selectedChatModel} onSelectChatModel={onSelectChatModel} apiKey={apiKey} onOpenApiKeyModal={onOpenApiKeyModal} isJumperVisible={showConversationJumper} />
               </div>
               <div className="flex items-center gap-2">
@@ -507,26 +444,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   </button>
               </Tooltip>
             )}
-             {keywordSuggestions.length > 0 && (
-              <div className="flex items-center gap-2 overflow-x-auto pb-3 scrollbar-hide">
-                  {keywordSuggestions.map((suggestion, index) => (
-                      <button
-                          key={index}
-                          onClick={() => handleKeywordClick(suggestion.text)}
-                          className={`animate-fade-in-up flex-shrink-0 px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
-                            suggestion.type === 'code'
-                                ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/60'
-                                : 'bg-neutral-100 dark:bg-[#2E2F33] text-neutral-700 dark:text-gray-300 hover:bg-neutral-200 dark:hover:bg-gray-700/70'
-                          }`}
-                          style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                          {suggestion.text}
-                      </button>
-                  ))}
-              </div>
-            )}
             <div className="flex-1">
-                 <textarea ref={textareaRef} rows={1} value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={handleKeyPress} onPaste={handlePaste} placeholder={placeholderText()} disabled={isLoading || isRefining} className="w-full bg-transparent text-neutral-800 dark:text-gray-200 placeholder:text-neutral-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-0 transition-all duration-300 disabled:opacity-50 resize-none max-h-[8rem] overflow-y-auto scrollbar-hide cursor-text" />
+                 <textarea ref={textareaRef} rows={1} value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={handleKeyPress} onPaste={handlePaste} placeholder={placeholderText()} disabled={isLoading} className="w-full bg-transparent text-neutral-800 dark:text-gray-200 placeholder:text-neutral-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-0 transition-all duration-300 disabled:opacity-50 resize-none max-h-[8rem] overflow-y-auto scrollbar-hide cursor-text" />
             </div>
             <div className="flex justify-between items-end mt-2">
                 <div className="flex items-end gap-2">
@@ -589,18 +508,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
                         </div>
                     )}
 
-                    {selectedTool === 'multi-agent' && (
-                        <Tooltip content="Refine prompt with AI">
-                            <button
-                                onClick={handleRefine}
-                                disabled={isLoading || isRefining || !input.trim()}
-                                className="flex items-center justify-center w-10 h-10 p-2 rounded-full text-neutral-600 dark:text-gray-300 hover:bg-neutral-300/50 dark:hover:bg-gray-700/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                aria-label="Refine prompt"
-                            >
-                                {isRefining ? <LoaderCircle className="h-6 w-6 animate-spin" /> : <Wand2 className="h-6 w-6" />}
-                            </button>
-                        </Tooltip>
-                    )}
                     {isSpeechSupported ? <MicButton /> : (
                         <Tooltip content="Voice input is not supported on this browser.">
                              <div className="flex items-center justify-center w-10 h-10">
@@ -610,7 +517,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     )}
                 </div>
 
-                <button onClick={isLoading ? onCancelStream : handleSend} disabled={isLoading ? false : isSendDisabled} className={`flex items-center justify-center transition-all duration-300 ${isLoading ? 'bg-red-600 hover:bg-red-500 h-10 rounded-full' : 'bg-black dark:bg-white text-white dark:text-black disabled:bg-neutral-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed w-10 h-10 rounded-full'}`} aria-label={isLoading ? `Stop generating (${formatTime(elapsedTime)})` : "Send message"}>
+                <button onClick={isLoading ? onCancelStream : handleSend} disabled={isLoading ? false : isSendActionDisabled} className={`flex items-center justify-center transition-all duration-300 ${isLoading ? 'bg-red-600 hover:bg-red-500 h-10 rounded-full' : 'bg-black dark:bg-white text-white dark:text-black disabled:bg-neutral-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed w-10 h-10 rounded-full'}`} aria-label={isLoading ? `Stop generating (${formatTime(elapsedTime)})` : "Send message"}>
                     {isLoading ? (
                       <div className="flex items-center justify-center gap-2 px-3 text-white w-full">
                           <div className="relative w-6 h-6">

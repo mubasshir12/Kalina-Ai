@@ -1,12 +1,10 @@
 import React, { createContext, useState, useCallback, useContext, useEffect } from 'react';
-import { ConsoleLogEntry, TokenLog } from '../types';
+import { ConsoleLogEntry } from '../types';
 import { initAppLogger } from '../services/appLogger';
 
 interface DebugContextType {
     logs: ConsoleLogEntry[];
-    tokenLogs: TokenLog[];
     addLog: (log: Omit<ConsoleLogEntry, 'id' | 'timestamp'>) => void;
-    addTokenLog: (log: Omit<TokenLog, 'id' | 'timestamp' | 'totalTokens'>) => void;
     logError: (error: any) => void;
     clearLogs: () => void;
 }
@@ -15,7 +13,6 @@ const DebugContext = createContext<DebugContextType | undefined>(undefined);
 
 export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [logs, setLogs] = useState<ConsoleLogEntry[]>([]);
-    const [tokenLogs, setTokenLogs] = useState<TokenLog[]>([]);
 
     const addLog = useCallback((log: Omit<ConsoleLogEntry, 'id' | 'timestamp'>) => {
         const newLog: ConsoleLogEntry = {
@@ -43,16 +40,6 @@ export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         });
     }, []);
 
-    const addTokenLog = useCallback((log: Omit<TokenLog, 'id' | 'timestamp' | 'totalTokens'>) => {
-        const newLog: TokenLog = {
-            id: crypto.randomUUID(),
-            timestamp: new Date().toLocaleTimeString(),
-            totalTokens: log.inputTokens + log.outputTokens,
-            ...log,
-        };
-        setTokenLogs(prev => [...prev, newLog]);
-    }, []);
-
     const logError = useCallback((error: any) => {
         console.error("[DEV CONSOLE]", error); // Also log to the actual browser console
         addLog({
@@ -64,7 +51,6 @@ export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const clearLogs = useCallback(() => {
         setLogs([]);
-        setTokenLogs([]);
     }, []);
 
     useEffect(() => {
@@ -74,7 +60,7 @@ export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, [addLog]);
 
     return (
-        <DebugContext.Provider value={{ logs, tokenLogs, addLog, addTokenLog, logError, clearLogs }}>
+        <DebugContext.Provider value={{ logs, addLog, logError, clearLogs }}>
             {children}
         </DebugContext.Provider>
     );

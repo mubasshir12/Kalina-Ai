@@ -1,16 +1,12 @@
-import { ChatMessage, Conversation, PlannerContextItem, TokenLog } from '../types';
+import { ChatMessage, Conversation, PlannerContextItem } from '../types';
 import { appLogger } from './appLogger';
-import { generateConvoSummaries } from './memoryService';
 
 // Function type for updating the conversation state, imported from useConversations hook
 type UpdateConversationFn = (conversationId: string, updater: (convo: Conversation) => Conversation) => void;
-type AddTokenLogFn = (log: Omit<TokenLog, 'id' | 'timestamp' | 'totalTokens'>) => void;
 
 const taskQueue: { userMessage: ChatMessage; modelMessage: ChatMessage; conversationId: string }[] = [];
 let isProcessing = false;
 let updateConversationCallback: UpdateConversationFn | null = null;
-let addTokenLogCallback: AddTokenLogFn | null = null;
-
 
 // Common English and Hinglish stop words to be ignored during scoring.
 const STOP_WORDS = new Set([
@@ -182,12 +178,9 @@ const processQueue = async () => {
     setTimeout(processQueue, 1000);
 };
 
-export const initializeSummarizer = (updateFn: UpdateConversationFn, tokenLogFn?: AddTokenLogFn) => {
+export const initializeSummarizer = (updateFn: UpdateConversationFn) => {
     if (updateConversationCallback) return;
     updateConversationCallback = updateFn;
-    if (tokenLogFn) {
-        addTokenLogCallback = tokenLogFn;
-    }
     setInterval(() => {
         if (!isProcessing) {
             processQueue();

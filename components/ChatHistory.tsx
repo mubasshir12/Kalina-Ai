@@ -1,5 +1,7 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { ChatMessage as ChatMessageType, MoleculeData, OrbitalData, GroundingChunk } from '../types';
+
+
+import React, { useRef, useEffect, useState } from 'react';
+import { ChatMessage as ChatMessageType } from '../types';
 import ChatMessage from './ChatMessage';
 
 interface ChatHistoryProps {
@@ -13,115 +15,60 @@ interface ChatHistoryProps {
   scrollContainerRef: React.RefObject<HTMLDivElement>;
   setModalImage: (url: string | null) => void;
   setCodeForPreview: (data: { code: string; language: string; } | null) => void;
-  isSelectionMode: boolean;
-  selectedMessageIds: Set<string>;
-  onToggleMessageSelection: (userMessageId: string) => void;
-  onMaximizeMoleculeViewer: (molecule: MoleculeData) => void;
-  onMaximizeOrbitalViewer: (orbital: OrbitalData) => void;
-  onViewSources: (sources: GroundingChunk[]) => void;
 }
 
-const ChatHistory: React.FC<ChatHistoryProps> = ({ 
-  messages, 
-  isLoading, 
-  isThinking, 
-  isSearchingWeb, 
-  onRetry, 
-  onEditMessage, 
-  onCancelStream, 
-  scrollContainerRef, 
-  setModalImage, 
-  setCodeForPreview,
-  isSelectionMode,
-  selectedMessageIds,
-  onToggleMessageSelection,
-  onMaximizeMoleculeViewer,
-  onMaximizeOrbitalViewer,
-  onViewSources
-}) => {
+const ChatHistory: React.FC<ChatHistoryProps> = ({ messages, isLoading, isThinking, isSearchingWeb, onRetry, onEditMessage, onCancelStream, scrollContainerRef, setModalImage, setCodeForPreview }) => {
   const [isLockedToBottom, setIsLockedToBottom] = useState(true);
 
+  // Effect to auto-scroll when new messages stream in, if the user is already at the bottom.
   useEffect(() => {
     if (isLockedToBottom && scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
     }
   }, [messages, isLoading, isThinking, isSearchingWeb, isLockedToBottom, scrollContainerRef]);
 
+  // Effect to track user scrolling and determine if we should lock to the bottom.
   useEffect(() => {
     const scrollableElement = scrollContainerRef.current;
     if (!scrollableElement) return;
 
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = scrollableElement;
+      // A small threshold ensures that the user is truly at the bottom before locking.
       const atBottom = scrollHeight - scrollTop - clientHeight < 50;
       setIsLockedToBottom(atBottom);
     };
 
     scrollableElement.addEventListener('scroll', handleScroll, { passive: true });
+
+    // Initial check
     handleScroll();
 
     return () => scrollableElement.removeEventListener('scroll', handleScroll);
   }, [scrollContainerRef]);
 
-  const pairedMessages = useMemo(() => {
-      const result: ({ type: 'pair'; user: ChatMessageType; model: ChatMessageType } | { type: 'single'; message: ChatMessageType })[] = [];
-      let i = 0;
-      while (i < messages.length) {
-          const current = messages[i];
-          if (current.role === 'user' && i + 1 < messages.length && messages[i + 1].role === 'model') {
-              result.push({ type: 'pair', user: current, model: messages[i + 1] });
-              i += 2;
-          } else {
-              result.push({ type: 'single', message: current });
-              i += 1;
-          }
-      }
-      return result;
-  }, [messages]);
-
   return (
     <div className="space-y-4">
-      {pairedMessages.map((item) => {
-        if (item.type === 'pair') {
-            const isSelected = selectedMessageIds.has(item.user.id);
-            const canSelect = !isLoading && !isThinking;
-            const isLastPair = item.model.id === messages[messages.length - 1]?.id;
-
-            return (
-                <div
-                    key={item.user.id}
-                    onClick={isSelectionMode && canSelect ? () => onToggleMessageSelection(item.user.id) : undefined}
-                    className={`transition-colors duration-200 rounded-lg ${isSelectionMode && canSelect ? 'cursor-pointer' : ''} ${isSelected ? 'bg-amber-50 dark:bg-amber-900/20' : ''}`}
-                >
-                    <div className={isSelectionMode ? 'p-2' : ''}>
-                        <ChatMessage {...item.user} isSelectionMode={isSelectionMode} index={messages.findIndex(m => m.id === item.user.id)} onEditMessage={onEditMessage} setModalImage={setModalImage} setCodeForPreview={setCodeForPreview} onMaximizeMoleculeViewer={onMaximizeMoleculeViewer} onMaximizeOrbitalViewer={onMaximizeOrbitalViewer} onViewSources={() => onViewSources(item.user.sources || [])} />
-                        <div className="h-4" />
-                        <ChatMessage {...item.model} isSelectionMode={isSelectionMode} index={messages.findIndex(m => m.id === item.model.id)} onRetry={isLastPair && !isLoading && !isThinking ? onRetry : undefined} isStreaming={isLoading && isLastPair} isThinking={isThinking && isLastPair} isSearchingWeb={isSearchingWeb && isLastPair} setModalImage={setModalImage} setCodeForPreview={setCodeForPreview} onMaximizeMoleculeViewer={onMaximizeMoleculeViewer} onMaximizeOrbitalViewer={onMaximizeOrbitalViewer} onViewSources={() => onViewSources(item.model.sources || [])} />
-                    </div>
-                </div>
-            );
-        } else { // single message
-            const isLastMessage = item.message.id === messages[messages.length-1]?.id;
-            return (
-                <div key={item.message.id} className={isSelectionMode ? 'opacity-50' : ''}>
-                    <ChatMessage 
-                        {...item.message}
-                        isSelectionMode={isSelectionMode}
-                        index={messages.findIndex(m => m.id === item.message.id)}
-                        onEditMessage={item.message.role === 'user' ? onEditMessage : undefined}
-                        onRetry={isLastMessage && item.message.role === 'model' && !isLoading && !isThinking ? onRetry : undefined}
-                        isStreaming={isLoading && isLastMessage}
-                        isThinking={isThinking && isLastMessage}
-                        isSearchingWeb={isSearchingWeb && isLastMessage}
-                        setModalImage={setModalImage}
-                        setCodeForPreview={setCodeForPreview}
-                        onMaximizeMoleculeViewer={onMaximizeMoleculeViewer}
-                        onMaximizeOrbitalViewer={onMaximizeOrbitalViewer}
-                        onViewSources={() => onViewSources(item.message.sources || [])}
-                    />
-                </div>
-            );
-        }
+      {messages.map((msg, index) => {
+        const isLastMessage = index === messages.length - 1;
+        const canRetry = isLastMessage && msg.role === 'model' && !isLoading && !isThinking && !msg.isPlanning;
+        const isStreamingNow = isLoading && isLastMessage && !msg.isPlanning;
+        
+        return (
+          <ChatMessage 
+            key={msg.id} 
+            {...msg}
+            isStreaming={isStreamingNow}
+            isThinking={isThinking && index === messages.length - 1}
+            isSearchingWeb={isSearchingWeb && index === messages.length - 1}
+            onRetry={canRetry ? onRetry : undefined}
+            index={index}
+            onEditMessage={msg.role === 'user' ? onEditMessage : undefined}
+            onCancelStream={isStreamingNow ? onCancelStream : undefined}
+            setModalImage={setModalImage}
+            setCodeForPreview={setCodeForPreview}
+          />
+        );
       })}
     </div>
   );

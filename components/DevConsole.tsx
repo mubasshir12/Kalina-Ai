@@ -1,16 +1,20 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { ConsoleLogEntry, ConsoleMode, TokenLog } from '../types';
+import { ConsoleLogEntry, ConsoleMode } from '../types';
 import { getHintForError } from '../utils/errorHints';
-import { getAiHelpForError, AiHelpResult } from '../services/debugService';
+import { getAiHelpForError } from '../services/debugService';
 import { X, Trash2, Copy, Check, Info, Wand2, LoaderCircle, ChevronDown } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useDraggableSheet } from '../hooks/useDraggableSheet';
-import { useDebug } from '../contexts/DebugContext';
-import StoragePanel from './StoragePanel';
-import WordManagementPanel from './WordManagementPanel';
+
+interface DevConsoleProps {
+    isOpen: boolean;
+    onClose: () => void;
+    mode: ConsoleMode;
+    logs: ConsoleLogEntry[];
+    clearLogs: () => void;
+}
 
 const LogEntryItem: React.FC<{ log: ConsoleLogEntry }> = ({ log }) => {
-    const { addTokenLog } = useDebug();
     const [isCopied, setIsCopied] = useState(false);
     const [aiHelp, setAiHelp] = useState<string>('');
     const [isGettingHelp, setIsGettingHelp] = useState(false);
@@ -29,18 +33,8 @@ const LogEntryItem: React.FC<{ log: ConsoleLogEntry }> = ({ log }) => {
         setShowLangPrompt(false);
         setIsGettingHelp(true);
         setIsAiHelpVisible(true);
-        const { helpText, usage } = await getAiHelpForError({ message: log.message, stack: log.stack }, language);
+        const helpText = await getAiHelpForError({ message: log.message, stack: log.stack }, language);
         setAiHelp(helpText);
-        
-        if (usage.inputTokens > 0 || usage.outputTokens > 0) {
-            addTokenLog({
-                source: 'AI Debugger',
-                inputTokens: usage.inputTokens,
-                outputTokens: usage.outputTokens,
-                details: language
-            });
-        }
-
         setIsGettingHelp(false);
     };
 
@@ -128,60 +122,9 @@ const LogEntryItem: React.FC<{ log: ConsoleLogEntry }> = ({ log }) => {
     );
 };
 
-const TokenLogPanel: React.FC<{ logs: TokenLog[] }> = ({ logs }) => {
-    const totalTokens = useMemo(() => logs.reduce((acc, log) => acc + log.totalTokens, 0), [logs]);
 
-    if (logs.length === 0) {
-        return (
-            <div className="flex items-center justify-center h-full text-neutral-400 dark:text-gray-500 p-4 text-center">
-                No token usage logged yet.
-            </div>
-        );
-    }
-
-    return (
-        <div className="text-sm font-mono">
-            <div className="p-3 sticky top-0 bg-white/80 dark:bg-[#1e1f22]/80 backdrop-blur-sm border-b border-neutral-200 dark:border-gray-700">
-                <p className="font-bold text-neutral-800 dark:text-gray-200">Total Logged Tokens: {totalTokens.toLocaleString()}</p>
-            </div>
-            <table className="w-full text-left">
-                <thead className="text-xs text-neutral-500 dark:text-gray-400 uppercase bg-neutral-50 dark:bg-gray-800/50">
-                    <tr>
-                        <th className="px-3 py-2">Timestamp</th>
-                        <th className="px-3 py-2">Source</th>
-                        <th className="px-3 py-2 text-right">Input</th>
-                        <th className="px-3 py-2 text-right">Output</th>
-                        <th className="px-3 py-2 text-right">Total</th>
-                    </tr>
-                </thead>
-                <tbody className="text-xs text-neutral-700 dark:text-gray-300">
-                    {logs.map(log => (
-                        <tr key={log.id} className="border-b border-neutral-100 dark:border-gray-700/50 hover:bg-neutral-50 dark:hover:bg-gray-800/30">
-                            <td className="px-3 py-2 text-neutral-400 dark:text-gray-500">{log.timestamp}</td>
-                            <td className="px-3 py-2 font-semibold">{log.source}</td>
-                            <td className="px-3 py-2 text-right">{log.inputTokens.toLocaleString()}</td>
-                            <td className="px-3 py-2 text-right">{log.outputTokens.toLocaleString()}</td>
-                            <td className="px-3 py-2 text-right font-bold">{log.totalTokens.toLocaleString()}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    );
-};
-
-interface DevConsoleProps {
-    isOpen: boolean;
-    onClose: () => void;
-    mode: ConsoleMode;
-    logs: ConsoleLogEntry[];
-    clearLogs: () => void;
-    onNavigateToAnalysis: () => void;
-}
-
-const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose, mode, logs, clearLogs, onNavigateToAnalysis }) => {
-    const { tokenLogs } = useDebug();
-    const [filter, setFilter] = useState<'all' | 'error' | 'warn' | 'tokens' | 'words' | 'storage'>('all');
+const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose, logs, clearLogs }) => {
+    const [filter, setFilter] = useState<'all' | 'error' | 'warn'>('all');
     const consoleBodyRef = useRef<HTMLDivElement>(null);
     const sheetRef = useRef<HTMLDivElement>(null);
     const { sheetStyle, handleRef } = useDraggableSheet(sheetRef, onClose, isOpen);
@@ -189,30 +132,25 @@ const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose, mode, logs, cl
     const errorCount = useMemo(() => logs.filter(l => l.level === 'error').length, [logs]);
     const warningCount = useMemo(() => logs.filter(l => l.level === 'warn').length, [logs]);
     
-    // Fix: Define the filteredLogs variable to correctly filter logs based on the selected tab.
     const filteredLogs = useMemo(() => {
-        if (filter === 'all') {
-            return logs;
-        }
-        // The filter state can be 'error' or 'warn', which directly maps to log levels.
-        return logs.filter(log => log.level === filter);
+        if (filter === 'error') return logs.filter(l => l.level === 'error');
+        if (filter === 'warn') return logs.filter(l => l.level === 'warn');
+        return logs;
     }, [logs, filter]);
 
-    const TABS: { id: typeof filter; label: string }[] = [
+    useEffect(() => {
+        if (filteredLogs.length > 0 && consoleBodyRef.current) {
+            consoleBodyRef.current.scrollTop = consoleBodyRef.current.scrollHeight;
+        }
+    }, [filteredLogs]);
+    
+    const TABS: { id: 'all' | 'error' | 'warn'; label: string }[] = [
         { id: 'all', label: 'All' },
-        { id: 'warn', label: 'Warnings' },
         { id: 'error', label: 'Errors' },
-        { id: 'tokens', label: 'Tokens' },
-        { id: 'words', label: 'Words' },
-        { id: 'storage', label: 'Storage' },
+        { id: 'warn', label: 'Warnings' },
     ];
     
-    const counts = { all: logs.length, error: errorCount, warn: warningCount, tokens: tokenLogs.length, words: '', storage: '' };
-
-    const handleNavigate = () => {
-        onNavigateToAnalysis();
-        onClose();
-    };
+    const counts = { all: logs.length, error: errorCount, warn: warningCount };
 
     return (
         <div className={`fixed inset-0 bg-black/50 z-40 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose} aria-hidden="true">
@@ -236,35 +174,29 @@ const DevConsole: React.FC<DevConsoleProps> = ({ isOpen, onClose, mode, logs, cl
                     </div>
                 </header>
                 <div className="flex-shrink-0 border-b border-neutral-200 dark:border-gray-700 px-2 sm:px-4">
-                    <div className="flex items-center gap-2 sm:gap-4 -mb-px overflow-x-auto scrollbar-hide">
+                    <div className="flex items-center gap-2 sm:gap-4 -mb-px">
                         {TABS.map(tab => (
                             <button
                                 key={tab.id}
                                 onClick={() => setFilter(tab.id)}
-                                className={`flex-shrink-0 py-3 px-1 sm:px-2 text-sm font-semibold border-b-2 transition-colors ${
+                                className={`py-3 px-1 sm:px-2 text-sm font-semibold border-b-2 transition-colors ${
                                     filter === tab.id
                                         ? 'border-amber-500 text-amber-600 dark:text-amber-400'
                                         : 'border-transparent text-neutral-500 dark:text-gray-400 hover:text-neutral-700 dark:hover:text-gray-200 hover:border-neutral-300 dark:hover:border-gray-500'
                                 }`}
                             >
-                                {tab.label} {counts[tab.id] !== '' && <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
+                                {tab.label} <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
                                     filter === tab.id
                                         ? 'bg-amber-100 dark:bg-amber-900/40'
                                         : 'bg-neutral-100 dark:bg-gray-700/50'
-                                }`}>{counts[tab.id]}</span>}
+                                }`}>{counts[tab.id]}</span>
                             </button>
                         ))}
                     </div>
                 </div>
                 <div ref={consoleBodyRef} className="flex-1 overflow-y-auto">
-                   {filter === 'storage' ? (
-                       <StoragePanel excludeStores={['words']} />
-                   ) : filter === 'tokens' ? (
-                       <TokenLogPanel logs={tokenLogs} />
-                   ) : filter === 'words' ? (
-                       <WordManagementPanel onNavigateToAnalysis={handleNavigate} />
-                   ) : filteredLogs.length === 0 ? (
-                        <div className="flex items-center justify-center h-full text-neutral-400 dark:text-gray-400 p-4 text-center">
+                    {filteredLogs.length === 0 ? (
+                        <div className="flex items-center justify-center h-full text-neutral-400 dark:text-gray-500 p-4 text-center">
                             {filter === 'all' ? 'No logs yet.' : `No ${filter}s logged.`}
                         </div>
                     ) : (

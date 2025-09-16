@@ -1,3 +1,7 @@
+
+
+
+
 import React, { useState } from 'react';
 import { LayoutGrid, History } from 'lucide-react';
 import { ConsoleMode } from '../types';
@@ -7,15 +11,11 @@ import MenuSheet from './MenuSheet';
 interface HeaderProps {
     onShowMemory: () => void;
     onShowUsage: () => void;
-    onShowStorage: () => void;
     isChatView: boolean;
     consoleMode: ConsoleMode;
     setConsoleMode: (mode: ConsoleMode) => void;
     onOpenHistory: () => void;
     conversationCount: number;
-    isSelectionMode: boolean;
-    onToggleSelectionMode: () => void;
-    hasActiveConversation: boolean;
 }
 
 const Header: React.FC<HeaderProps> = (props) => {
@@ -67,13 +67,8 @@ const Header: React.FC<HeaderProps> = (props) => {
         onClose={() => setIsMenuSheetOpen(false)}
         onShowMemory={props.onShowMemory}
         onShowUsage={props.onShowUsage}
-        onShowStorage={props.onShowStorage}
         consoleMode={props.consoleMode}
         setConsoleMode={props.setConsoleMode}
-        isChatView={props.isChatView}
-        hasActiveConversation={props.hasActiveConversation}
-        isSelectionMode={props.isSelectionMode}
-        onToggleSelectionMode={props.onToggleSelectionMode}
       />
     </>
   );
