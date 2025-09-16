@@ -1,6 +1,8 @@
 
 
 
+
+
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Suggestion, Tool, ChatModel, ModelInfo, View, ConsoleMode, ChatMessage, MoleculeData, OrbitalData, AgentName, GroundingChunk } from './types';
 import { initializeAiClient } from './services/aiClient';
@@ -559,7 +561,7 @@ const App: React.FC = () => {
 
     return (
         <>
-            <div className="relative flex flex-col h-screen bg-[#F9F6F2] dark:bg-transparent text-neutral-800 dark:text-white transition-colors duration-300">
+            <div className="relative flex flex-col h-screen overflow-hidden bg-[#F9F6F2] dark:bg-transparent text-neutral-800 dark:text-white transition-colors duration-300">
                 <div className="absolute inset-0 z-0">
                     {isDarkMode ? <ParticleUniverse /> : <Globe />}
                 </div>
