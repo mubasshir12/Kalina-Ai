@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ArrowLeft, RefreshCw, Search, Download } from 'lucide-react';
 import { getAllWords } from '../services/dbService';
@@ -248,7 +249,7 @@ const WordAnalysisView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }, [sortedFrequency]);
 
     return (
-        <main className="relative z-10 flex-1 flex flex-col overflow-y-auto p-4 md:p-6">
+        <main className="relative z-10 p-4 md:p-6">
             <div className="max-w-6xl mx-auto w-full">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center">

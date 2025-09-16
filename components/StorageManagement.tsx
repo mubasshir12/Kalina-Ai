@@ -105,14 +105,14 @@ const StorageManagement: React.FC<StorageManagementProps> = ({ onBack }) => {
 
     if (isLoading) {
         return (
-            <main className="relative z-10 flex-1 flex items-center justify-center p-4 md:p-6">
+            <main className="relative z-10 flex items-center justify-center p-4 md:p-6">
                  <p className="text-center text-neutral-500 dark:text-gray-400">Calculating storage usage...</p>
             </main>
         );
     }
 
     return (
-        <main className="relative z-10 flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="relative z-10 p-4 md:p-6">
             <div className="max-w-4xl mx-auto">
                 <div className="flex items-center mb-6">
                     <button onClick={onBack} className="p-2 rounded-full hover:bg-neutral-200 dark:hover:bg-gray-800 transition-colors mr-2 md:mr-4" aria-label="Back to chat">

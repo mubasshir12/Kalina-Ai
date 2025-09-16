@@ -49,7 +49,7 @@ const UsageDetailView: React.FC<UsageDetailViewProps> = ({ conversation, onBack,
 
     if (!conversation) {
         return (
-            <main className="relative z-10 flex-1 overflow-y-auto p-4 md:p-6 text-center">
+            <main className="relative z-10 p-4 md:p-6 text-center">
                 <p>Conversation not found.</p>
                 <button onClick={onBack} className="mt-4 text-amber-600 dark:text-amber-400">Go Back</button>
             </main>
@@ -57,7 +57,7 @@ const UsageDetailView: React.FC<UsageDetailViewProps> = ({ conversation, onBack,
     }
 
     return (
-        <main className="relative z-10 flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="relative z-10 p-4 md:p-6">
             <div className="max-w-4xl mx-auto">
                 <div className="flex items-center mb-6">
                     <button onClick={onBack} className="p-2 rounded-full hover:bg-neutral-200 dark:hover:bg-gray-800 transition-colors mr-2 md:mr-4" aria-label="Back to usage dashboard">
