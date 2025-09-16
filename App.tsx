@@ -1,8 +1,5 @@
 
 
-
-
-
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Suggestion, Tool, ChatModel, ModelInfo, View, ConsoleMode, ChatMessage, MoleculeData, OrbitalData, AgentName, GroundingChunk } from './types';
 import { initializeAiClient } from './services/aiClient';
@@ -28,7 +25,6 @@ import SourceViewer from './components/SourceViewer';
 import { useScrollSpy } from './hooks/useScrollSpy';
 import { Trash2 } from 'lucide-react';
 import { getSetting, saveSetting, getTranslatorUsage, saveTranslatorUsage, getAllWords } from './services/dbService';
-import ToolSelectionAnimation from './components/ToolSelectionAnimation';
 
 const models: ModelInfo[] = [
     { id: 'gemini-2.5-flash', name: 'Kalina 2.5 Flash', description: 'Optimized for speed and efficiency.' },
@@ -71,11 +67,6 @@ const App: React.FC = () => {
     // State for code-related keywords, now fetched dynamically
     const [codeKeywords, setCodeKeywords] = useState<string[]>([]);
     const [englishWords, setEnglishWords] = useState<string[]>([]);
-    
-    // State for Tool Selection Animation
-    const [animationProps, setAnimationProps] = useState<{ start: DOMRect; end: DOMRect } | null>(null);
-    const ctaButtonRef = useRef<HTMLButtonElement>(null);
-    const toolSelectorRef = useRef<HTMLDivElement>(null);
 
 
     // Dev Console State
@@ -544,24 +535,11 @@ const App: React.FC = () => {
         setSourcesForViewer(sources);
     };
 
-    const handleTryMultiAgent = () => {
-        const startRect = ctaButtonRef.current?.getBoundingClientRect();
-        const endRect = toolSelectorRef.current?.getBoundingClientRect();
-
-        if (startRect && endRect) {
-            setAnimationProps({ start: startRect, end: endRect });
-            handleToolChange('multi-agent');
-        } else {
-            // Fallback for safety if refs aren't ready
-            handleToolChange('multi-agent');
-        }
-    };
-
     const showConsoleToggleButton = consoleMode === 'manual' || (consoleMode === 'auto' && logs.length > 0);
 
     return (
         <>
-            <div className="relative flex flex-col h-screen overflow-hidden bg-[#F9F6F2] dark:bg-transparent text-neutral-800 dark:text-white transition-colors duration-300">
+            <div className="relative flex flex-col h-screen bg-[#F9F6F2] dark:bg-transparent text-neutral-800 dark:text-white transition-colors duration-300 overflow-hidden">
                 <div className="absolute inset-0 z-0">
                     {isDarkMode ? <ParticleUniverse /> : <Globe />}
                 </div>
@@ -579,53 +557,50 @@ const App: React.FC = () => {
                     onToggleSelectionMode={onToggleSelectionMode}
                     hasActiveConversation={!!activeConversation && activeConversation.messages.length > 0}
                 />
-                <div ref={scrollContainerRef} className={`flex-1 min-h-0 ${currentView === 'chat' && showWelcomeScreen ? 'overflow-hidden' : 'overflow-y-auto scrollbar-hide'}`}>
-                    <ViewRenderer
-                        currentView={currentView}
-                        showWelcomeScreen={showWelcomeScreen}
-                        activeConversation={activeConversation}
-                        conversations={conversationManager.conversations}
-                        isLoading={chatHandler.isLoading}
-                        isThinking={chatHandler.isThinking}
-                        isSearchingWeb={chatHandler.isSearchingWeb}
-                        ltm={ltm}
-                        translatorUsage={translatorUsage}
-                        handleRetry={handleRetry}
-                        handleEditMessage={handleEditMessage}
-                        handleSelectSuggestion={handleSelectSuggestion}
-                        handleCancelStream={handleCancelStream}
-                        setCurrentView={setCurrentView}
-                        setLtm={setLtm}
-                        scrollContainerRef={scrollContainerRef}
-                        onCloseTranslator={() => {
-                            setSelectedTool('smart');
-                            setCurrentView('chat');
-                        }}
-                        onTranslationComplete={handleTranslationComplete}
-                        setModalImage={setModalImage}
-                        setCodeForPreview={setCodeForPreview}
-                        viewingUsageConvoId={viewingUsageConvoId}
-                        onViewUsageDetails={handleViewUsageDetails}
-                        viewingConvo={viewingConvo}
-                        onViewConvoDetails={handleViewConvoDetails}
-                        onTryMultiAgent={handleTryMultiAgent}
-                        ctaRef={ctaButtonRef}
-                        onSaveEditor={handleSaveEditor}
-                        editorInitialText={input}
-                        onSaveEditedImage={handleSaveEditedImage}
-                        imageToEdit={imageToEdit}
-                        isSelectionMode={isSelectionMode}
-                        selectedMessageIds={selectedMessageIds}
-                        onToggleMessageSelection={handleToggleMessageSelection}
-                        moleculeForFullScreen={moleculeForFullScreen}
-                        onMaximizeMoleculeViewer={handleMaximizeMoleculeViewer}
-                        orbitalForFullScreen={orbitalForFullScreen}
-                        onMaximizeOrbitalViewer={handleMaximizeOrbitalViewer}
-                        onViewSources={handleViewSources}
-                    />
-                </div>
+
+                <ViewRenderer
+                    currentView={currentView}
+                    showWelcomeScreen={showWelcomeScreen}
+                    activeConversation={activeConversation}
+                    conversations={conversationManager.conversations}
+                    isLoading={chatHandler.isLoading}
+                    isThinking={chatHandler.isThinking}
+                    isSearchingWeb={chatHandler.isSearchingWeb}
+                    ltm={ltm}
+                    translatorUsage={translatorUsage}
+                    handleRetry={handleRetry}
+                    handleEditMessage={handleEditMessage}
+                    handleSelectSuggestion={handleSelectSuggestion}
+                    handleCancelStream={handleCancelStream}
+                    setCurrentView={setCurrentView}
+                    setLtm={setLtm}
+                    scrollContainerRef={scrollContainerRef}
+                    onCloseTranslator={() => {
+                        setSelectedTool('smart');
+                        setCurrentView('chat');
+                    }}
+                    onTranslationComplete={handleTranslationComplete}
+                    setModalImage={setModalImage}
+                    setCodeForPreview={setCodeForPreview}
+                    viewingUsageConvoId={viewingUsageConvoId}
+                    onViewUsageDetails={handleViewUsageDetails}
+                    viewingConvo={viewingConvo}
+                    onViewConvoDetails={handleViewConvoDetails}
+                    onSaveEditor={handleSaveEditor}
+                    editorInitialText={input}
+                    onSaveEditedImage={handleSaveEditedImage}
+                    imageToEdit={imageToEdit}
+                    isSelectionMode={isSelectionMode}
+                    selectedMessageIds={selectedMessageIds}
+                    onToggleMessageSelection={handleToggleMessageSelection}
+                    moleculeForFullScreen={moleculeForFullScreen}
+                    onMaximizeMoleculeViewer={handleMaximizeMoleculeViewer}
+                    orbitalForFullScreen={orbitalForFullScreen}
+                    onMaximizeOrbitalViewer={handleMaximizeOrbitalViewer}
+                    onViewSources={handleViewSources}
+                />
                 
-                <div className="relative flex-shrink-0">
+                <div className="relative">
                     {isSelectionMode && selectedMessageIds.size > 0 && (
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 w-full max-w-4xl px-4 pb-2 z-30 pointer-events-none">
                             <div className="flex items-center justify-between gap-4 bg-white/80 dark:bg-[#1e1f22]/80 backdrop-blur-md rounded-xl p-3 shadow-lg border border-neutral-200 dark:border-gray-700 w-full sm:w-auto sm:min-w-[300px] mx-auto pointer-events-auto">
@@ -672,7 +647,6 @@ const App: React.FC = () => {
                                     elapsedTime={elapsedTime}
                                     selectedTool={selectedTool}
                                     onToolChange={handleToolChange}
-                                    toolSelectorRef={toolSelectorRef}
                                     activeSuggestion={activeSuggestion}
                                     onClearSuggestion={() => setActiveSuggestion(null)}
                                     onCancelStream={handleRequestCancelStream}
@@ -723,14 +697,6 @@ const App: React.FC = () => {
                 )}
             </div>
             
-            {animationProps && (
-              <ToolSelectionAnimation
-                startRect={animationProps.start}
-                endRect={animationProps.end}
-                onComplete={() => setAnimationProps(null)}
-              />
-            )}
-
             <ModelSwitchModal
                 isOpen={isModelSwitchModalOpen}
                 onClose={() => {

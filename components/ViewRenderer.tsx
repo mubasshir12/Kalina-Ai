@@ -1,5 +1,5 @@
 import React from 'react';
-import { Conversation, LTM, Suggestion, View, ChatMessage, MoleculeData, OrbitalData, GroundingChunk, Tool } from '../types';
+import { Conversation, LTM, Suggestion, View, ChatMessage, MoleculeData, OrbitalData, GroundingChunk } from '../types';
 import ChatHistory from './ChatHistory';
 import WelcomeScreen from './WelcomeScreen';
 import MemoryManagement from './MemoryManagement';
@@ -17,7 +17,7 @@ import { ArrowLeft } from 'lucide-react';
 
 const FullScreenMoleculeView: React.FC<{ molecule: MoleculeData; onBack: () => void; }> = ({ molecule, onBack }) => {
     return (
-        <main className="relative z-10 flex flex-col p-4 md:p-6 h-full">
+        <main className="relative z-10 flex-1 flex flex-col p-4 md:p-6 overflow-hidden h-full">
             <div className="flex items-center mb-6 flex-shrink-0">
                 <button onClick={onBack} className="p-2 rounded-full hover:bg-neutral-200/50 dark:hover:bg-gray-800/50 transition-colors mr-2 md:mr-4" aria-label="Back to chat">
                     <ArrowLeft className="h-6 w-6" />
@@ -33,7 +33,7 @@ const FullScreenMoleculeView: React.FC<{ molecule: MoleculeData; onBack: () => v
 
 const FullScreenOrbitalView: React.FC<{ orbital: OrbitalData; onBack: () => void; }> = ({ orbital, onBack }) => {
     return (
-        <main className="relative z-10 flex flex-col p-4 md:p-6 h-full">
+        <main className="relative z-10 flex-1 flex flex-col p-4 md:p-6 overflow-hidden h-full">
             <div className="flex items-center mb-6 flex-shrink-0">
                 <button onClick={onBack} className="p-2 rounded-full hover:bg-neutral-200/50 dark:hover:bg-gray-800/50 transition-colors mr-2 md:mr-4" aria-label="Back to chat">
                     <ArrowLeft className="h-6 w-6" />
@@ -72,8 +72,6 @@ interface ViewRendererProps {
     onViewUsageDetails: (conversationId: string) => void;
     viewingConvo: { user: ChatMessage; model: ChatMessage; serialNumber: number } | null;
     onViewConvoDetails: (convoPair: { user: ChatMessage; model: ChatMessage; serialNumber: number }) => void;
-    onTryMultiAgent: () => void;
-    ctaRef: React.Ref<HTMLButtonElement>;
     onSaveEditor: (newText: string) => void;
     editorInitialText: string;
     onSaveEditedImage: (newBase64: string) => void;
@@ -113,8 +111,6 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
     onViewUsageDetails,
     viewingConvo,
     onViewConvoDetails,
-    onTryMultiAgent,
-    ctaRef,
     onSaveEditor,
     editorInitialText,
     onSaveEditedImage,
@@ -183,35 +179,42 @@ const ViewRenderer: React.FC<ViewRendererProps> = ({
         case 'chat':
         default:
             return (
-                <main className="relative z-10 h-full">
-                   {showWelcomeScreen ? (
-                        <WelcomeScreen onSelectSuggestion={handleSelectSuggestion} onTryMultiAgent={onTryMultiAgent} ctaRef={ctaRef} />
-                    ) : (
-                        <div className="px-2 pt-4 md:px-4 md:pt-6 pb-2">
-                            <div className="max-w-4xl mx-auto">
-                                {activeConversation && (
-                                    <ChatHistory
-                                        messages={activeConversation.messages}
-                                        isLoading={isLoading}
-                                        isThinking={isThinking}
-                                        isSearchingWeb={isSearchingWeb}
-                                        onRetry={handleRetry}
-                                        onEditMessage={handleEditMessage}
-                                        onCancelStream={handleCancelStream}
-                                        scrollContainerRef={scrollContainerRef}
-                                        setModalImage={setModalImage}
-                                        setCodeForPreview={setCodeForPreview}
-                                        isSelectionMode={isSelectionMode}
-                                        selectedMessageIds={selectedMessageIds}
-                                        onToggleMessageSelection={onToggleMessageSelection}
-                                        onMaximizeMoleculeViewer={onMaximizeMoleculeViewer}
-                                        onMaximizeOrbitalViewer={onMaximizeOrbitalViewer}
-                                        onViewSources={onViewSources}
-                                    />
-                                )}
-                            </div>
+                <main className="relative z-10 flex-1 flex flex-col overflow-hidden">
+                    <div className="flex-1 relative">
+                        <div 
+                            ref={scrollContainerRef} 
+                            className={`absolute inset-0 ${!showWelcomeScreen ? 'overflow-y-auto scrollbar-hide' : 'overflow-hidden'}`}
+                        >
+                           {showWelcomeScreen ? (
+                                <WelcomeScreen onSelectSuggestion={handleSelectSuggestion} />
+                            ) : (
+                                <div className="px-2 pt-4 md:px-4 md:pt-6 pb-2">
+                                    <div className="max-w-4xl mx-auto">
+                                        {activeConversation && (
+                                            <ChatHistory
+                                                messages={activeConversation.messages}
+                                                isLoading={isLoading}
+                                                isThinking={isThinking}
+                                                isSearchingWeb={isSearchingWeb}
+                                                onRetry={handleRetry}
+                                                onEditMessage={handleEditMessage}
+                                                onCancelStream={handleCancelStream}
+                                                scrollContainerRef={scrollContainerRef}
+                                                setModalImage={setModalImage}
+                                                setCodeForPreview={setCodeForPreview}
+                                                isSelectionMode={isSelectionMode}
+                                                selectedMessageIds={selectedMessageIds}
+                                                onToggleMessageSelection={onToggleMessageSelection}
+                                                onMaximizeMoleculeViewer={onMaximizeMoleculeViewer}
+                                                onMaximizeOrbitalViewer={onMaximizeOrbitalViewer}
+                                                onViewSources={onViewSources}
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    )}
+                    </div>
                 </main>
             );
     }

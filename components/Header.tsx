@@ -23,7 +23,7 @@ const Header: React.FC<HeaderProps> = (props) => {
 
   return (
     <>
-      <header className="bg-white/5 dark:bg-black/5 backdrop-blur-sm border-b border-neutral-200/50 dark:border-white/10 p-4 z-30 flex-shrink-0">
+      <header className="bg-white/5 dark:bg-black/5 backdrop-blur-sm border-b border-neutral-200/50 dark:border-white/10 p-4 sticky top-0 z-30">
         <div className="max-w-4xl mx-auto flex items-center justify-between relative">
           <div className="flex items-center">
             <h1 className="text-2xl font-bold bg-gradient-to-br from-amber-600 to-orange-600 dark:from-amber-400 dark:to-orange-500 bg-clip-text text-transparent text-3d-effect tracking-tight select-none">

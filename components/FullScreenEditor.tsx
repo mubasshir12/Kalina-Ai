@@ -19,7 +19,7 @@ const FullScreenEditor: React.FC<FullScreenEditorProps> = ({ onBack, onSave, ini
     };
 
     return (
-        <main className="relative z-10 flex flex-col p-4 md:p-6 h-full">
+        <main className="relative z-10 flex-1 flex flex-col p-4 md:p-6 overflow-hidden h-full">
             {/* Header with only the title */}
             <div className="flex items-center mb-6 flex-shrink-0">
                 <h1 className="text-2xl md:text-3xl font-bold text-neutral-800 dark:text-gray-200">

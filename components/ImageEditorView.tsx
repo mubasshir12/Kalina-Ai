@@ -164,7 +164,7 @@ const ImageEditorView: React.FC<ImageEditorViewProps> = ({ onBack, onSave, image
     };
     
     return (
-        <main className="relative z-10 flex flex-col p-4 md:p-6 h-full">
+        <main className="relative z-10 flex-1 flex flex-col p-4 md:p-6 overflow-hidden h-full">
             <div className="flex items-center justify-between mb-6 flex-shrink-0">
                 <div className="flex items-center">
                     <button onClick={onBack} className="p-2 rounded-full hover:bg-neutral-200/50 dark:hover:bg-gray-800/50 transition-colors mr-2 md:mr-4" aria-label="Back to chat">

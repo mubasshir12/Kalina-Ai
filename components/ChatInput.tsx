@@ -1,7 +1,6 @@
 
 
 
-
 import React, { useState, KeyboardEvent, useRef, ChangeEvent, useEffect } from 'react';
 import { Suggestion, Tool, ChatModel, ModelInfo } from '../types';
 import { Sparkles, ChevronDown, X, Paperclip, ArrowUp, Globe, BrainCircuit, Image, Expand, File, Presentation, FileText, Camera, Languages, Link, ClipboardPaste, ChevronUp, Mic, FlaskConical, Pencil, Maximize2, BotMessageSquare, Wand2, LoaderCircle } from 'lucide-react';
@@ -55,7 +54,6 @@ interface ChatInputProps {
   elapsedTime: number;
   selectedTool: Tool;
   onToolChange: (tool: Tool) => void;
-  toolSelectorRef: React.RefObject<HTMLDivElement>;
   activeSuggestion: Suggestion | null;
   onClearSuggestion: () => void;
   onCancelStream: () => void;
@@ -110,7 +108,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
     elapsedTime,
     selectedTool,
     onToolChange,
-    toolSelectorRef,
     activeSuggestion,
     onClearSuggestion,
     onCancelStream,
@@ -457,7 +454,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           <input ref={fileInputRef} type="file" accept="application/pdf, text/plain" onChange={handleFileChange} className="hidden" />
           
           <div className="flex items-center justify-between px-1">
-              <div ref={toolSelectorRef} className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 <ToolSelectionModal 
                     selectedTool={selectedTool}
                     onToolChange={onToolChange}
@@ -591,16 +588,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                             )}
                         </div>
                     )}
-                    {isSpeechSupported ? <MicButton /> : (
-                        <Tooltip content="Voice input is not supported on this browser.">
-                             <div className="flex items-center justify-center w-10 h-10">
-                                <MicButton />
-                            </div>
-                        </Tooltip>
-                    )}
-                </div>
 
-                <div className="flex items-end gap-2">
                     {selectedTool === 'multi-agent' && (
                         <Tooltip content="Refine prompt with AI">
                             <button
@@ -613,21 +601,28 @@ const ChatInput: React.FC<ChatInputProps> = ({
                             </button>
                         </Tooltip>
                     )}
-
-                    <button onClick={isLoading ? onCancelStream : handleSend} disabled={isLoading ? false : isSendDisabled} className={`flex items-center justify-center transition-all duration-300 ${isLoading ? 'bg-red-600 hover:bg-red-500 h-10 rounded-full' : 'bg-black dark:bg-white text-white dark:text-black disabled:bg-neutral-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed w-10 h-10 rounded-full'}`} aria-label={isLoading ? `Stop generating (${formatTime(elapsedTime)})` : "Send message"}>
-                        {isLoading ? (
-                        <div className="flex items-center justify-center gap-2 px-3 text-white w-full">
-                            <div className="relative w-6 h-6">
-                                <div className="w-full h-full animate-spin" style={{ borderRadius: '50%', border: '2px solid white', borderTopColor: 'transparent' }} />
-                                <div className="absolute inset-0 flex items-center justify-center"><div className="w-2.5 h-2.5 bg-white" /></div>
+                    {isSpeechSupported ? <MicButton /> : (
+                        <Tooltip content="Voice input is not supported on this browser.">
+                             <div className="flex items-center justify-center w-10 h-10">
+                                <MicButton />
                             </div>
-                            <span className="text-sm font-mono font-semibold">{formatTime(elapsedTime)}</span>
-                        </div>
-                        ) : (
-                        <ArrowUp className="h-6 w-6" />
-                        )}
-                    </button>
+                        </Tooltip>
+                    )}
                 </div>
+
+                <button onClick={isLoading ? onCancelStream : handleSend} disabled={isLoading ? false : isSendDisabled} className={`flex items-center justify-center transition-all duration-300 ${isLoading ? 'bg-red-600 hover:bg-red-500 h-10 rounded-full' : 'bg-black dark:bg-white text-white dark:text-black disabled:bg-neutral-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed w-10 h-10 rounded-full'}`} aria-label={isLoading ? `Stop generating (${formatTime(elapsedTime)})` : "Send message"}>
+                    {isLoading ? (
+                      <div className="flex items-center justify-center gap-2 px-3 text-white w-full">
+                          <div className="relative w-6 h-6">
+                              <div className="w-full h-full animate-spin" style={{ borderRadius: '50%', border: '2px solid white', borderTopColor: 'transparent' }} />
+                              <div className="absolute inset-0 flex items-center justify-center"><div className="w-2.5 h-2.5 bg-white" /></div>
+                          </div>
+                          <span className="text-sm font-mono font-semibold">{formatTime(elapsedTime)}</span>
+                      </div>
+                    ) : (
+                      <ArrowUp className="h-6 w-6" />
+                    )}
+                </button>
             </div>
           </div>
       </div>

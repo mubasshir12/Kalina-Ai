@@ -129,12 +129,7 @@ export const startChatSession = (
   return chat;
 };
 
-const enhancePromptSystemInstruction = `You are an expert at refining user prompts. Your goal is to rewrite the user's query into a single, cohesive, and more detailed paragraph. The refined prompt should be clearer and provide more context for the AI to generate a high-quality response.
-
-**CRITICAL RULES:**
-1.  **Single Paragraph Only:** Your entire output MUST be a single paragraph. Do NOT use markdown, headings, bullet points, lists, or any special formatting.
-2.  **Natural Language:** The output must be a natural, conversational prompt that a user would send. It should not be a set of instructions for the AI.
-3.  **Direct Output:** Respond ONLY with the refined prompt text. Do NOT include any explanations, greetings, or conversational text like "Here is the refined prompt:".`;
+const enhancePromptSystemInstruction = `You are a prompt engineering expert. Your task is to rewrite a user's query to be clearer, more detailed, and optimized for a multi-agent AI system. The system consists of a Researcher, Fact-Checker, Advocate, Critic, and Synthesizer. The refined prompt should guide these agents to produce a comprehensive and nuanced analysis. Focus on adding context, specifying the desired output format, and breaking down ambiguous requests into concrete questions. **Return ONLY the refined prompt, without any commentary or conversational text.**`;
 
 export const enhancePrompt = async (prompt: string): Promise<string> => {
     if (!prompt.trim()) {

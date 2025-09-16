@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Content, Part } from '@google/genai';
 import { ChatMessage as ChatMessageType, Suggestion, ChatModel, LTM, CodeSnippet, GroundingChunk, UserProfile, Tool, Conversation, AgentName, AgentProcess } from '../types';
@@ -262,8 +261,7 @@ export const useChatHandler = ({
                                 : m
                         ));
                     } else if (progress.status === 'finished' && progress.duration) {
-                        const { agent, duration, usedWebSearch, inputTokens, outputTokens } = progress as any;
-                        agentProcesses.push({ agent, duration, usedWebSearch, inputTokens, outputTokens });
+                        agentProcesses.push({ agent: progress.agent, duration: progress.duration, usedWebSearch: progress.usedWebSearch });
                         // Sort the processes to ensure they render in the correct pipeline order
                         const sortedProcesses = agentProcesses.sort((a, b) => {
                             const order: AgentName[] = ['researcher', 'fact-checker', 'advocate', 'critic', 'executer', 'finalizer'];
@@ -289,23 +287,13 @@ export const useChatHandler = ({
                 (finalResult) => { // onFinalResult
                     if (isCancelledRef.current) return;
                     const { promptTokenCount, candidatesTokenCount } = finalResult.usage;
-                    
-                    const finalizerProcess = agentProcesses.find(p => p.agent === 'finalizer');
-                    if (finalizerProcess) {
-                        finalizerProcess.inputTokens = promptTokenCount;
-                        finalizerProcess.outputTokens = candidatesTokenCount;
-                    }
-
-                    const totalInput = agentProcesses.reduce((sum, p) => sum + (p.inputTokens || 0), 0);
-                    const totalOutput = agentProcesses.reduce((sum, p) => sum + (p.outputTokens || 0), 0);
-
-                    addTokenLog({ source: 'Multi-Agent', inputTokens: totalInput, outputTokens: totalOutput, details: `${allAgents.size} agents` });
+                    addTokenLog({ source: 'Multi-Agent', inputTokens: promptTokenCount, outputTokens: candidatesTokenCount, details: `${allAgents.size} agents` });
                     
                     updateConversationMessages(currentConversationId, prev => {
                         const last = prev[prev.length - 1];
                         return [...prev.slice(0, -1), {
                             ...last, isMultiAgent: false, activeAgent: undefined, sources: allSources.length > 0 ? allSources : undefined, agentProcess: agentProcesses,
-                            inputTokens: totalInput, outputTokens: totalOutput, generationTime: Date.now() - responseStartTimeRef.current,
+                            inputTokens: promptTokenCount, outputTokens: candidatesTokenCount, generationTime: Date.now() - responseStartTimeRef.current,
                         }];
                     });
                     setIsLoading(false);
